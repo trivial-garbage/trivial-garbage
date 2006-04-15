@@ -1,0 +1,2 @@
+trivial-garbage is a simple library that provides a portable API to
+finalizers, weak hash-tables and weak pointers.
