@@ -66,7 +66,7 @@
                     ;;(assert (null *finalized?*))
                     (setf (nth i *finalized?*) t)))))
     (when remove
-      (cancel-finalizations obj)))
+      (cancel-finalization obj)))
   (gc :full t))
 
 (defun do-it-to-it (setup-function &rest args)

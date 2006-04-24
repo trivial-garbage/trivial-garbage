@@ -37,13 +37,13 @@
 
 ;;;; Weak Pointers
 
-;;; Previous OpenMCL implementation involved using a weak-key
-;;; hash-table. Less efficient, but less likely to break in the
-;;; future, hmm...
+#+:openmcl
+(defvar *weak-pointers* (make-hash-table :test 'eq :weak :value)
+  "Weak value hash-table mapping between pseudo weak pointers and its values.")
 
 #+(or :allegro :openmcl :lispworks)
 (defstruct (weak-pointer (:constructor %make-weak-pointer))
-  pointer)
+  #-:openmcl pointer)
 
 (defun make-weak-pointer (object)
   "Creates a new weak pointer which points to OBJECT. For
@@ -57,10 +57,9 @@ portability reasons, OBJECT most not be NIL."
     (setf (svref wv 0) object)
     (%make-weak-pointer :pointer wv))
   #+:openmcl
-  (let ((nhv (ccl::%cons-nhash-vector 1 4096)))
-    (setf (ccl::%svref nhv 10) object
-          (ccl::%svref nhv 11) t)
-    (%make-weak-pointer :pointer nhv))
+  (let ((wp (%make-weak-pointer)))
+    (setf (gethash wp *weak-pointers*) object)
+    wp)
   #+:corman (ccl:make-weak-pointer object)
   #+:lispworks
   (let ((array (make-array 1)))
@@ -82,8 +81,7 @@ portability reasons, OBJECT most not be NIL."
   #+:cmu (prog1 (ext:weak-pointer-value weak-pointer))
   #+:clisp (prog1 (ext:weak-pointer-value weak-pointer))
   #+:allegro (svref (weak-pointer-pointer weak-pointer) 0)
-  #+:openmcl (when (ccl::%svref (weak-pointer-pointer weak-pointer) 11)
-               (ccl::%svref (weak-pointer-pointer weak-pointer) 10))
+  #+:openmcl (prog1 (gethash weak-pointer *weak-pointers*))
   #+:corman (ccl:weak-pointer-obj weak-pointer)
   #+:lispworks (svref (weak-pointer-pointer weak-pointer) 0))
 
@@ -166,13 +164,13 @@ arguments as CL:MAKE-HASH-TABLE."
 (progn
   (hcl:add-special-free-action 'free-action)
   (defun free-action (object)
-    (let ((finalizations (gethash object *finalizers*)))
-      (unless (null finalizations)
-        (mapc #'funcall finalizations)))))
+    (let ((finalizers (gethash object *finalizers*)))
+      (unless (null finalizers)
+        (mapc #'funcall finalizers)))))
 
 (defun finalize (object function)
   "Pushes a new FUNCTION to the OBJECT's list of
-finalizations. FUNCTION should take no arguments. Returns OBJECT.
+finalizers. FUNCTION should take no arguments. Returns OBJECT.
 
 For portability reasons, FUNCTION should not attempt to look at
 OBJECT by closing over it because, in some lisps, OBJECT will
@@ -197,20 +195,20 @@ accessible when FUNCTION is invoked."
   (progn
     (ccl:terminate-when-unreachable
      object (lambda (obj) (declare (ignore obj)) (funcall function)))
-    ;; store number of finalizations
+    ;; store number of finalizers
     (if (gethash object *finalizers*)
         (incf (gethash object *finalizers*))
         (setf (gethash object *finalizers*) 1))
     object)
   #+:corman
-  (flet ((get-finalizations (obj)
+  (flet ((get-finalizers (obj)
            (assoc obj *finalizers* :test #'eq :key #'ccl:weak-pointer-obj)))
-    (let ((pair (get-finalizations object)))
+    (let ((pair (get-finalizers object)))
       (if (null pair)
           (push (list (ccl:make-weak-pointer object) function) *finalizers*)
           (push function (cdr pair))))
     (ccl:register-finalization
-     object (lambda (obj) (mapc #'funcall (cdr (get-finalizations obj)))))
+     object (lambda (obj) (mapc #'funcall (cdr (get-finalizers obj)))))
     object)
   #+:lispworks
   (progn
@@ -219,7 +217,7 @@ accessible when FUNCTION is invoked."
     object))
 
 (defun cancel-finalization (object)
-  "Cancels all of OBJECT's finalizations, if any."
+  "Cancels all of OBJECT's finalizers, if any."
   #+:cmu (ext:cancel-finalization object)
   #+:sbcl (sb-ext:cancel-finalization object)
   #+:allegro
@@ -233,7 +231,7 @@ accessible when FUNCTION is invoked."
     (unless (null count)
       (dotimes (i count)
         (ccl:cancel-terminate-when-unreachable object))))
-  #+:corman (setf *finalizers*
+  #+:corman (setq *finalizers*
                   (delete object *finalizers*
                           :test #'eq :key #'ccl:weak-pointer-obj))
   #+:lispworks
