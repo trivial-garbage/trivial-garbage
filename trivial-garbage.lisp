@@ -18,7 +18,7 @@
            #:make-weak-key-hash-table
            #:make-weak-value-hash-table
            #:finalize
-           #:cancel-finalizations))
+           #:cancel-finalization))
 
 (in-package #:trivial-garbage)
 
@@ -218,7 +218,7 @@ accessible when FUNCTION is invoked."
     (hcl:flag-special-free-action object)
     object))
 
-(defun cancel-finalizations (object)
+(defun cancel-finalization (object)
   "Cancels all of OBJECT's finalizations, if any."
   #+:cmu (ext:cancel-finalization object)
   #+:sbcl (sb-ext:cancel-finalization object)
