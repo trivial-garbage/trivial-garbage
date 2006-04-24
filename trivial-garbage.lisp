@@ -150,23 +150,23 @@ arguments as CL:MAKE-HASH-TABLE."
 ;;; the finalizer is somewhat unfortunate...
 
 #+(or :allegro :clisp :lispworks :openmcl)
-(defvar *finalizations*
+(defvar *finalizers*
   (make-hash-table :test 'eq
                    #+:allegro :weak-keys #+:allegro t
                    #+(or :clisp :openmcl) :weak
                    #+:lispworks :weak-kind
                    #+(or :clisp :openmcl :lispworks) :key)
-  "Weak hashtable that holds registered finalizations.")
+  "Weak hashtable that holds registered finalizers.")
 
 #+:corman
-(defvar *finalizations* '()
-  "Weak alist that holds registered finalizations.")
+(defvar *finalizers* '()
+  "Weak alist that holds registered finalizers.")
 
 #+:lispworks
 (progn
   (hcl:add-special-free-action 'free-action)
   (defun free-action (object)
-    (let ((finalizations (gethash object *finalizations*)))
+    (let ((finalizations (gethash object *finalizers*)))
       (unless (null finalizations)
         (mapc #'funcall finalizations)))))
 
@@ -184,37 +184,37 @@ accessible when FUNCTION is invoked."
   (progn
     (push (excl:schedule-finalization
            object (lambda (obj) (declare (ignore obj)) (funcall function)))
-          (gethash object *finalizations*))
+          (gethash object *finalizers*))
     object)
   #+:clisp
   (progn
-    (push function (gethash object *finalizations*))
+    (push function (gethash object *finalizers*))
     (ext:finalize object
                   (lambda (obj)
-                    (mapc #'funcall (gethash obj *finalizations*))))
+                    (mapc #'funcall (gethash obj *finalizers*))))
     object)
   #+:openmcl
   (progn
     (ccl:terminate-when-unreachable
      object (lambda (obj) (declare (ignore obj)) (funcall function)))
     ;; store number of finalizations
-    (if (gethash object *finalizations*)
-        (incf (gethash object *finalizations*))
-        (setf (gethash object *finalizations*) 1))
+    (if (gethash object *finalizers*)
+        (incf (gethash object *finalizers*))
+        (setf (gethash object *finalizers*) 1))
     object)
   #+:corman
   (flet ((get-finalizations (obj)
-           (assoc obj *finalizations* :test #'eq :key #'ccl:weak-pointer-obj)))
+           (assoc obj *finalizers* :test #'eq :key #'ccl:weak-pointer-obj)))
     (let ((pair (get-finalizations object)))
       (if (null pair)
-          (push (list (ccl:make-weak-pointer object) function) *finalizations*)
+          (push (list (ccl:make-weak-pointer object) function) *finalizers*)
           (push function (cdr pair))))
     (ccl:register-finalization
      object (lambda (obj) (mapc #'funcall (cdr (get-finalizations obj)))))
     object)
   #+:lispworks
   (progn
-    (push function (gethash object *finalizations*))
+    (push function (gethash object *finalizers*))
     (hcl:flag-special-free-action object)
     object))
 
@@ -225,18 +225,18 @@ accessible when FUNCTION is invoked."
   #+:allegro
   (progn
     (mapc #'excl:unschedule-finalization
-          (gethash object *finalizations*))
-    (remhash object *finalizations*))
-  #+:clisp (remhash object *finalizations*)
+          (gethash object *finalizers*))
+    (remhash object *finalizers*))
+  #+:clisp (remhash object *finalizers*)
   #+:openmcl
-  (let ((count (gethash object *finalizations*)))
+  (let ((count (gethash object *finalizers*)))
     (unless (null count)
       (dotimes (i count)
         (ccl:cancel-terminate-when-unreachable object))))
-  #+:corman (setf *finalizations*
-                  (delete object *finalizations*
+  #+:corman (setf *finalizers*
+                  (delete object *finalizers*
                           :test #'eq :key #'ccl:weak-pointer-obj))
   #+:lispworks
   (progn
-    (remhash object *finalizations*)
+    (remhash object *finalizers*)
     (hcl:flag-not-special-free-action object)))
