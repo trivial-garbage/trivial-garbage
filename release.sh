@@ -13,7 +13,7 @@ echo "Signing tarball..."
 gpg -b -a "$TARBALL_NAME.tar.gz"
 
 echo "Copying tarball to web server..."
-#scp "$TARBALL" "$SIGNATURE" common-lisp.net:"$RELEASE_DIR"
+scp "$TARBALL" "$SIGNATURE" common-lisp.net:"$RELEASE_DIR"
 
 echo "Uploaded $TARBALL and $SIGNATURE."
 echo "Don't forget to update the link on the CLiki page!"
