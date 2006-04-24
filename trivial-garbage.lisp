@@ -2,27 +2,9 @@
 ;;;
 ;;; trivial-garbage.lisp --- Trivial Garbage!
 ;;;
-;;; Copyright (C) 2006, Luis Oliveira  <loliveira(@)common-lisp.net>
-;;;
-;;; Permission is hereby granted, free of charge, to any person
-;;; obtaining a copy of this software and associated documentation
-;;; files (the "Software"), to deal in the Software without
-;;; restriction, including without limitation the rights to use, copy,
-;;; modify, merge, publish, distribute, sublicense, and/or sell copies
-;;; of the Software, and to permit persons to whom the Software is
-;;; furnished to do so, subject to the following conditions:
-;;;
-;;; The above copyright notice and this permission notice shall be
-;;; included in all copies or substantial portions of the Software.
-;;;
-;;; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-;;; EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-;;; MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-;;; NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-;;; HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-;;; WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-;;; OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-;;; DEALINGS IN THE SOFTWARE.
+;;; This software is placed in the public domain by Luis Oliveira
+;;; <loliveira@common-lisp.net> and is provided with absolutely no
+;;; warranty.
 
 (defpackage #:trivial-garbage
   (:use #:cl)
@@ -55,9 +37,13 @@
 
 ;;;; Weak Pointers
 
+;;; Previous OpenMCL implementation involved using a weak-key
+;;; hash-table. Less efficient, but less likely to break in the
+;;; future, hmm...
+
 #+(or :allegro :openmcl :lispworks)
-(defstruct %weak-pointer
-  value)
+(defstruct (weak-pointer (:constructor %make-weak-pointer))
+  pointer)
 
 (defun make-weak-pointer (object)
   "Creates a new weak pointer which points to OBJECT. For
@@ -67,40 +53,39 @@ portability reasons, OBJECT most not be NIL."
   #+:cmu (ext:make-weak-pointer object)
   #+:clisp (ext:make-weak-pointer object)
   #+:allegro
-  (let ((wp (make-%weak-pointer :value (excl:weak-vector 1))))
-    (setf (svref (%weak-pointer-value wp) 0) object)
-    wp)
+  (let ((wv (excl:weak-vector 1)))
+    (setf (svref wv 0) object)
+    (%make-weak-pointer :pointer wv))
   #+:openmcl
-  (let ((wp (make-%weak-pointer         ; so silly
-             :value (make-hash-table :test 'eq :weak :key :size 1))))
-    (setf (gethash t (%weak-pointer-value wp)) object)
-    wp)
+  (let ((nhv (ccl::%cons-nhash-vector 1 4096)))
+    (setf (ccl::%svref nhv 10) object
+          (ccl::%svref nhv 11) t)
+    (%make-weak-pointer :pointer nhv))
   #+:corman (ccl:make-weak-pointer object)
   #+:lispworks
-  (let ((wp (make-%weak-pointer :value (make-array 1))))
-    (hcl:set-array-weak (%weak-pointer-value wp) t)
-    (setf (svref (%weak-pointer-value wp) 0) object)
-    wp))
+  (let ((array (make-array 1)))
+    (hcl:set-array-weak array t)
+    (setf (svref array 0) object)
+    (%make-weak-pointer :pointer array)))
 
+#-(or :allegro :openmcl :lispworks)
 (defun weak-pointer-p (object)
   "Returns true if OBJECT is a weak pointer and NIL otherwise."
   #+:sbcl (sb-ext:weak-pointer-p object)
   #+:cmu (ext:weak-pointer-p object)
   #+:clisp (ext:weak-pointer-p object)
-  #+:allegro (%weak-pointer-p object)
-  #+:openmcl (%weak-pointer-p object)
-  #+:corman (ccl:weak-pointer-p object)
-  #+:lispworks (%weak-pointer-p object))
+  #+:corman (ccl:weak-pointer-p object))
 
 (defun weak-pointer-value (weak-pointer)
   "If WEAK-POINTER is valid, returns its value. Otherwise, returns NIL."
   #+:sbcl (prog1 (sb-ext:weak-pointer-value weak-pointer))
   #+:cmu (prog1 (ext:weak-pointer-value weak-pointer))
   #+:clisp (prog1 (ext:weak-pointer-value weak-pointer))
-  #+:allegro (svref (%weak-pointer-value weak-pointer) 0)
-  #+:openmcl (prog1 (gethash t (%weak-pointer-value weak-pointer)))
+  #+:allegro (svref (weak-pointer-pointer weak-pointer) 0)
+  #+:openmcl (when (ccl::%svref (weak-pointer-pointer weak-pointer) 11)
+               (ccl::%svref (weak-pointer-pointer weak-pointer) 10))
   #+:corman (ccl:weak-pointer-obj weak-pointer)
-  #+:lispworks (svref (%weak-pointer-value weak-pointer) 0))
+  #+:lispworks (svref (weak-pointer-pointer weak-pointer) 0))
 
 ;;;; Weak Hash-tables
 
@@ -117,28 +102,31 @@ portability reasons, OBJECT most not be NIL."
 
 (defun make-weak-key-hash-table (&rest args)
   "Creates an hash-table with weak keys. Accepts the same
-arguments as CL:MAKE-HASH-TABLE."
+arguments as CL:MAKE-HASH-TABLE except :TEST which is forced to
+be 'EQ." 
   #+(or :sbcl :corman) (declare (ignore args))
   #-(or :sbcl :corman)
-  (progn
-    (assert (eq (getf args :test) 'eq))
-    (apply #'make-hash-table
+  (progn 
+    (assert (let ((test (getf args :test)))
+              (or (null test) (eq test 'eq))))
+    (remf args :test)
+    (apply #'make-hash-table :test 'eq
            #+:allegro :weak-keys #+:allegro t
            #+:clisp :weak #+:clisp :key
            #+:cmu :weak-p #+:cmu t
            #+:openmcl :weak #+:openmcl :key
            #+:lispworks :weak-kind #+:lispworks :key
            args))
-  #+(or :sbcl :corman) 
+  #+(or :sbcl :corman)
   (error "Your lisp does not support weak key hash-tables."))
 
 (defun weak-value-hash-table-p (ht)
   "Returns true if HT is an hash-table with weak values, NIL otherwise."
   #+(or :sbcl :cmu :corman) (declare (ignore ht))
   #+:allegro (eq (excl:hash-table-values ht) :weak)
-  #+:clisp (eql (ext:hash-table-weak-p ht) :value)
-  #+:openmcl (eql (ccl::hash-table-weak-p ht) :value)
-  #+:lispworks (eql (system::hash-table-weak-kind ht) :value)
+  #+:clisp (eq (ext:hash-table-weak-p ht) :value)
+  #+:openmcl (eq (ccl::hash-table-weak-p ht) :value)
+  #+:lispworks (eq (system::hash-table-weak-kind ht) :value)
   #+(or :sbcl :cmu :corman)
   (error "Your lisp does not support weak value hash-tables."))
 
@@ -159,12 +147,20 @@ arguments as CL:MAKE-HASH-TABLE."
 ;;;; Finalizers
 
 ;;; The fact that SBCL/CMUCL throw away the object *before* running
-;;; the finalizer is unfortunate... It'd be nice to figure out a way
-;;; to work around that limitation.
+;;; the finalizer is somewhat unfortunate...
 
-#+(or :allegro :clisp :lispworks :corman :openmcl)
-(defvar *finalizations* (make-weak-key-hash-table :test 'eq)
+#+(or :allegro :clisp :lispworks :openmcl)
+(defvar *finalizations*
+  (make-hash-table :test 'eq
+                   #+:allegro :weak-keys #+:allegro t
+                   #+(or :clisp :openmcl) :weak
+                   #+:lispworks :weak-kind
+                   #+(or :clisp :openmcl :lispworks) :key)
   "Weak hashtable that holds registered finalizations.")
+
+#+:corman
+(defvar *finalizations* '()
+  "Weak alist that holds registered finalizations.")
 
 #+:lispworks
 (progn
@@ -207,11 +203,14 @@ accessible when FUNCTION is invoked."
         (setf (gethash object *finalizations*) 1))
     object)
   #+:corman
-  (progn
-    (push function (gethash object *finalizations*))
+  (flet ((get-finalizations (obj)
+           (assoc obj *finalizations* :test #'eq :key #'ccl:weak-pointer-obj)))
+    (let ((pair (get-finalizations object)))
+      (if (null pair)
+          (push (list (ccl:make-weak-pointer object) function) *finalizations*)
+          (push function (cdr pair))))
     (ccl:register-finalization
-     object (lambda (obj)
-              (mapc #'funcall (gethash obj *finalizations*))))
+     object (lambda (obj) (mapc #'funcall (cdr (get-finalizations obj)))))
     object)
   #+:lispworks
   (progn
@@ -234,7 +233,9 @@ accessible when FUNCTION is invoked."
     (unless (null count)
       (dotimes (i count)
         (ccl:cancel-terminate-when-unreachable object))))
-  #+:corman (remhash object *finalizations*)
+  #+:corman (setf *finalizations*
+                  (delete object *finalizations*
+                          :test #'eq :key #'ccl:weak-pointer-obj))
   #+:lispworks
   (progn
     (remhash object *finalizations*)
