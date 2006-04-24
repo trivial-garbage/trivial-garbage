@@ -47,7 +47,7 @@
 
 (defun make-weak-pointer (object)
   "Creates a new weak pointer which points to OBJECT. For
-portability reasons, OBJECT most not be NIL."
+   portability reasons, OBJECT most not be NIL."
   (assert (not (null object)))
   #+:sbcl (sb-ext:make-weak-pointer object)
   #+:cmu (ext:make-weak-pointer object)
@@ -100,8 +100,8 @@ portability reasons, OBJECT most not be NIL."
 
 (defun make-weak-key-hash-table (&rest args)
   "Creates an hash-table with weak keys. Accepts the same
-arguments as CL:MAKE-HASH-TABLE except :TEST which is forced to
-be 'EQ." 
+   arguments as CL:MAKE-HASH-TABLE except :TEST which is forced to
+   be 'EQ." 
   #+(or :sbcl :corman) (declare (ignore args))
   #-(or :sbcl :corman)
   (progn 
@@ -130,7 +130,7 @@ be 'EQ."
 
 (defun make-weak-value-hash-table (&rest args)
   "Creates an hash-table with weak values. Accepts the same
-arguments as CL:MAKE-HASH-TABLE."
+   arguments as CL:MAKE-HASH-TABLE."
   #+(or :sbcl :cmu :corman) (declare (ignore args))
   #-(or :sbcl :cmu :corman)
   (apply #'make-hash-table
@@ -157,8 +157,11 @@ arguments as CL:MAKE-HASH-TABLE."
   "Weak hashtable that holds registered finalizers.")
 
 #+:corman
-(defvar *finalizers* '()
-  "Weak alist that holds registered finalizers.")
+(progn
+  (defvar *finalizers* '()
+    "Weak alist that holds registered finalizers.")
+
+  (defvar *finalizers-cs* (threads:allocate-critical-section)))
 
 #+:lispworks
 (progn
@@ -170,12 +173,12 @@ arguments as CL:MAKE-HASH-TABLE."
 
 (defun finalize (object function)
   "Pushes a new FUNCTION to the OBJECT's list of
-finalizers. FUNCTION should take no arguments. Returns OBJECT.
+   finalizers. FUNCTION should take no arguments. Returns OBJECT.
 
-For portability reasons, FUNCTION should not attempt to look at
-OBJECT by closing over it because, in some lisps, OBJECT will
-already have been garbage collected and is therefore not
-accessible when FUNCTION is invoked."
+   For portability reasons, FUNCTION should not attempt to look
+   at OBJECT by closing over it because, in some lisps, OBJECT
+   will already have been garbage collected and is therefore not
+   accessible when FUNCTION is invoked."
   #+:cmu (ext:finalize object function)
   #+:sbcl (sb-ext:finalize object function)
   #+:allegro
@@ -203,12 +206,18 @@ accessible when FUNCTION is invoked."
   #+:corman
   (flet ((get-finalizers (obj)
            (assoc obj *finalizers* :test #'eq :key #'ccl:weak-pointer-obj)))
-    (let ((pair (get-finalizers object)))
-      (if (null pair)
-          (push (list (ccl:make-weak-pointer object) function) *finalizers*)
-          (push function (cdr pair))))
+    (threads:with-synchronization *finalizers-cs*
+      (let ((pair (get-finalizers object)))
+        (if (null pair)
+            (push (list (ccl:make-weak-pointer object) function) *finalizers*)
+            (push function (cdr pair)))))
     (ccl:register-finalization
-     object (lambda (obj) (mapc #'funcall (cdr (get-finalizers obj)))))
+     object (lambda (obj)
+              (threads:with-synchronization *finalizers-cs*
+                (mapc #'funcall (cdr (get-finalizers obj)))
+                (setq *finalizers*
+                      (delete obj *finalizers*
+                              :test #'eq :key #'ccl:weak-pointer-obj)))))
     object)
   #+:lispworks
   (progn
@@ -231,9 +240,10 @@ accessible when FUNCTION is invoked."
     (unless (null count)
       (dotimes (i count)
         (ccl:cancel-terminate-when-unreachable object))))
-  #+:corman (setq *finalizers*
-                  (delete object *finalizers*
-                          :test #'eq :key #'ccl:weak-pointer-obj))
+  #+:corman
+  (threads:with-synchronization *finalizers-cs*
+    (setq *finalizers*
+          (delete object *finalizers* :test #'eq :key #'ccl:weak-pointer-obj)))
   #+:lispworks
   (progn
     (remhash object *finalizers*)
