@@ -1,2 +1,9 @@
 trivial-garbage is a simple library that provides a portable API to
 finalizers, weak hash-tables and weak pointers.
+
+It is placed in the public domain with absolutely no warranty.
+
+The various bits of funcionality (finalizers, weak pointers, etc...)
+are mutually independent. Feel free to copy whatever bits you find
+useful into your own program as they are, after all, in the public
+domain. :-)
