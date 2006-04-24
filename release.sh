@@ -1,6 +1,6 @@
 #!/bin/sh
 
-VERSION=${VERSION:=`cat trivial-garbage.asd  | grep :version | sed -e "s/.*\"\(.*\)\".*/\1/"`}
+VERSION=${VERSION:=`grep :version trivial-garbage.asd | sed -e "s/.*\"\(.*\)\".*/\1/"`}
 TARBALL_NAME="trivial-garbage_$VERSION"
 TARBALL="$TARBALL_NAME.tar.gz"
 SIGNATURE="$TARBALL.asc"
