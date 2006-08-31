@@ -29,25 +29,29 @@
   (pushnew 'hashtables.weak-key.2 rt::*expected-failures*))
 
 (deftest hashtables.weak-key.1
-    (let ((ht (make-weak-key-hash-table)))
+    (let ((ht (make-weak-hash-table :weakness :key)))
       (values (hash-table-p ht)
-              (weak-key-hash-table-p ht)))
-  t t)
+              (hash-table-weakness ht)))
+  t :key)
 
 (deftest hashtables.weak-key.2
-    (let ((ht (make-weak-key-hash-table :test 'eq)))
+    (let ((ht (make-weak-hash-table :weakness :key :test 'eq)))
       (values (hash-table-p ht)
-              (weak-key-hash-table-p ht)))
-  t t)
+              (hash-table-weakness ht)))
+  t :key)
 
 #+(or :sbcl :cmu :corman)
 (pushnew 'hashtables.weak-value.1 rt::*expected-failures*)
 
 (deftest hashtables.weak-value.1
-    (let ((ht (make-weak-value-hash-table)))
+    (let ((ht (make-weak-hash-table :weakness :value)))
       (values (hash-table-p ht)
-              (weak-value-hash-table-p ht)))
-  t t)
+              (hash-table-weakness ht)))
+  t :value)
+
+(deftest hashtables.not-weak.1
+    (hash-table-weakness (make-hash-table))
+  nil)
 
 ;;;; Finalizers
 ;;;

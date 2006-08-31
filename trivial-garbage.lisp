@@ -8,6 +8,7 @@
 
 (defpackage #:trivial-garbage
   (:use #:cl)
+  (:shadow #:make-hash-table)
   (:nicknames #:tg)
   (:export #:gc
            #:make-weak-pointer
@@ -15,8 +16,8 @@
            #:weak-pointer-p
            #:weak-key-hash-table-p
            #:weak-value-hash-table-p
-           #:make-weak-key-hash-table
-           #:make-weak-value-hash-table
+           #:make-weak-hash-table
+           #:hash-table-weakness
            #:finalize
            #:cancel-finalization))
 
@@ -38,7 +39,7 @@
 ;;;; Weak Pointers
 
 #+:openmcl
-(defvar *weak-pointers* (make-hash-table :test 'eq :weak :value)
+(defvar *weak-pointers* (cl:make-hash-table :test 'eq :weak :value)
   "Weak value hash-table mapping between pseudo weak pointers and its values.")
 
 #+(or :allegro :openmcl :lispworks)
@@ -77,70 +78,79 @@
 
 (defun weak-pointer-value (weak-pointer)
   "If WEAK-POINTER is valid, returns its value. Otherwise, returns NIL."
-  #+:sbcl (prog1 (sb-ext:weak-pointer-value weak-pointer))
-  #+:cmu (prog1 (ext:weak-pointer-value weak-pointer))
-  #+:clisp (prog1 (ext:weak-pointer-value weak-pointer))
+  #+:sbcl (values (sb-ext:weak-pointer-value weak-pointer))
+  #+:cmu (values (ext:weak-pointer-value weak-pointer))
+  #+:clisp (values (ext:weak-pointer-value weak-pointer))
   #+:allegro (svref (weak-pointer-pointer weak-pointer) 0)
-  #+:openmcl (prog1 (gethash weak-pointer *weak-pointers*))
+  #+:openmcl (values (gethash weak-pointer *weak-pointers*))
   #+:corman (ccl:weak-pointer-obj weak-pointer)
   #+:lispworks (svref (weak-pointer-pointer weak-pointer) 0))
 
 ;;;; Weak Hash-tables
 
-(defun weak-key-hash-table-p (ht)
-  "Returns true if HT is an hash-table with weak keys, NIL otherwise."
-  #+(or :sbcl :corman) (declare (ignore ht))
-  #+:allegro (excl:hash-table-weak-keys ht)
-  #+:clisp (eq (ext:hash-table-weak-p ht) :key)
-  #+:cmu (lisp::hash-table-weak-p ht)
-  #+:openmcl (eq (ccl::hash-table-weak-p ht) :key)
-  #+:lispworks (eql (system::hash-table-weak-kind ht) :key)
-  #+(or :sbcl :corman)
-  (error "Your lisp does not support weak key hash-tables."))
+;;; Allegro can apparently create weak hash-tables with both weak keys
+;;; and weak values but it's not obvious whether it's an OR or an AND
+;;; relation. TODO: figure that out.
 
-(defun make-weak-key-hash-table (&rest args)
-  "Creates an hash-table with weak keys. Accepts the same
-   arguments as CL:MAKE-HASH-TABLE except :TEST which is forced to
-   be 'EQ." 
-  #+(or :sbcl :corman) (declare (ignore args))
-  #-(or :sbcl :corman)
-  (progn 
-    (assert (let ((test (getf args :test)))
-              (or (null test) (eq test 'eq))))
-    (remf args :test)
-    (apply #'make-hash-table :test 'eq
-           #+:allegro :weak-keys #+:allegro t
-           #+:clisp :weak #+:clisp :key
-           #+:cmu :weak-p #+:cmu t
-           #+:openmcl :weak #+:openmcl :key
-           #+:lispworks :weak-kind #+:lispworks :key
-           args))
-  #+(or :sbcl :corman)
-  (error "Your lisp does not support weak key hash-tables."))
+(defun weakness-keyword-arg (weakness)
+  (declare (ignorable weakness))
+  #+:sbcl :weakness
+  #+(or :clisp :openmcl) :weak
+  #+:lispworks :weak-kind
+  #+:allegro (case weakness (:key :weak-keys) (:value :values))
+  #+:cmu :weak-p)
 
-(defun weak-value-hash-table-p (ht)
-  "Returns true if HT is an hash-table with weak values, NIL otherwise."
-  #+(or :sbcl :cmu :corman) (declare (ignore ht))
-  #+:allegro (eq (excl:hash-table-values ht) :weak)
-  #+:clisp (eq (ext:hash-table-weak-p ht) :value)
-  #+:openmcl (eq (ccl::hash-table-weak-p ht) :value)
-  #+:lispworks (eq (system::hash-table-weak-kind ht) :value)
-  #+(or :sbcl :cmu :corman)
-  (error "Your lisp does not support weak value hash-tables."))
+(defun weakness-keyword-opt (weakness)
+  (ecase weakness
+    (:key
+     #+(or :lispworks :sbcl :clisp :openmcl) :key
+     #+(or :allegro :cmu) t
+     #-(or :lispworks :sbcl :clisp :openmcl :allegro :cmu)
+     (error "Your Lisp does not support weak key hash-tables."))
+    (:value
+     #+:allegro :weak
+     #+(or :clisp :openmcl :sbcl :lispworks) :value
+     #-(or :allegro :clisp :openmcl :sbcl :lispworks)
+     (error "Your Lisp does not support weak value hash-tables."))
+    (:key-or-value
+     #+(or :clisp :sbcl) :key-or-value
+     #-(or :clisp :sbcl)
+     (error "Your Lisp does not support weak key-or-value hash-tables."))
+    (:key-and-value
+     #+(or :clisp :sbcl) :key-and-value
+     #-(or :clisp :sbcl)
+     (error "Your Lisp does not support weak key-and-value hash-tables."))))
 
-(defun make-weak-value-hash-table (&rest args)
-  "Creates an hash-table with weak values. Accepts the same
-   arguments as CL:MAKE-HASH-TABLE."
-  #+(or :sbcl :cmu :corman) (declare (ignore args))
-  #-(or :sbcl :cmu :corman)
-  (apply #'make-hash-table
-         #+:allegro :values #+:allegro :weak
-         #+:clisp :weak #+:clisp :value
-         #+:openmcl :weak #+:openmcl :value
-         #+:lispworks :weak-kind #+:lispworks :value
-         args)
-  #+(or :sbcl :cmu :corman)
-  (error "Your lisp does not support weak value hash-tables."))
+(defun make-weak-hash-table (&rest args &key weakness &allow-other-keys)
+  (remf args :weakness)
+  (if weakness
+      (apply #'cl:make-hash-table
+             (weakness-keyword-arg weakness)
+             (weakness-keyword-opt weakness)
+             args)
+      (apply #'cl:make-hash-table args)))
+
+;;; If you want to use this function to override CL:MAKE-HASH-TABLE,
+;;; it's necessary to shadow-import it. For example:
+;;;
+;;;   (defpackage #:foo
+;;;     (:use #:common-lisp #:trivial-garbage)
+;;;     (:shadowing-import-from #:trivial-garbage #:make-hash-table))
+;;;
+(defun make-hash-table (&rest args)
+  (apply #'make-weak-hash-table args))
+
+(defun hash-table-weakness (ht)
+  "Returns one of nil, :key, :value, :key-or-value or :key-and-value."
+  #-(or :allegro :sbcl :clisp :cmu :openmcl :lispworks)
+  (declare (ignore ht))
+  #+:allegro (cond ((excl:hash-table-weak-keys ht) :key)
+                   ((eq (excl:hash-table-values ht) :weak) :value))
+  #+:sbcl (sb-ext:hash-table-weakness ht)
+  #+:clisp (ext:hash-table-weak-p ht)
+  #+:cmu (if (lisp::hash-table-weak-p ht) :key nil)
+  #+:openmcl (ccl::hash-table-weak-p ht)
+  #+:lispworks (system::hash-table-weak-kind ht))
 
 ;;;; Finalizers
 
@@ -149,11 +159,11 @@
 
 #+(or :allegro :clisp :lispworks :openmcl)
 (defvar *finalizers*
-  (make-hash-table :test 'eq
-                   #+:allegro :weak-keys #+:allegro t
-                   #+(or :clisp :openmcl) :weak
-                   #+:lispworks :weak-kind
-                   #+(or :clisp :openmcl :lispworks) :key)
+  (cl:make-hash-table :test 'eq
+                      #+:allegro :weak-keys #+:allegro t
+                      #+(or :clisp :openmcl) :weak
+                      #+:lispworks :weak-kind
+                      #+(or :clisp :openmcl :lispworks) :key)
   "Weak hashtable that holds registered finalizers.")
 
 #+:corman
