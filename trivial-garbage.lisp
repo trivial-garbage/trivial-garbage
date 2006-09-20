@@ -14,8 +14,6 @@
            #:make-weak-pointer
            #:weak-pointer-value
            #:weak-pointer-p
-           #:weak-key-hash-table-p
-           #:weak-value-hash-table-p
            #:make-weak-hash-table
            #:hash-table-weakness
            #:finalize
@@ -122,6 +120,13 @@
      (error "Your Lisp does not support weak key-and-value hash-tables."))))
 
 (defun make-weak-hash-table (&rest args &key weakness &allow-other-keys)
+  "Returns a new weak hash table. In addition to the standard arguments
+   accepted by CL:MAKE-HASH-TABLE, this function an extra keyword :WEAKNESS
+   that determines the kind of weak table it should create. WEAKNESS can be
+   one of :KEY, :VALUE, :KEY-OR-VALUE, :KEY-AND-VALUE.
+
+   TG::MAKE-HASH-TABLE is available as an alias for this function should you
+   wish to import it into your package and shadow CL:MAKE-HASH-TABLE."
   (remf args :weakness)
   (if weakness
       (apply #'cl:make-hash-table
@@ -141,12 +146,15 @@
   (apply #'make-weak-hash-table args))
 
 (defun hash-table-weakness (ht)
-  "Returns one of nil, :key, :value, :key-or-value or :key-and-value."
+  "Returns one of NIL, :KEY, :VALUE, :KEY-OR-VALUE or :KEY-AND-VALUE."
   #-(or :allegro :sbcl :clisp :cmu :openmcl :lispworks)
   (declare (ignore ht))
   #+:allegro (cond ((excl:hash-table-weak-keys ht) :key)
                    ((eq (excl:hash-table-values ht) :weak) :value))
-  #+:sbcl (sb-ext:hash-table-weakness ht)
+  #+#.(cl:if (cl:find-symbol "HASH-TABLE-WEAKNESS" "SB-EXT") '(and) '(or))
+  (sb-ext:hash-table-weakness ht)
+  #+(and :sbcl #.(cl:if (cl:find-symbol "HASH-TABLE-WEAKNESS" "SB-EXT") '(or) '(and)))
+  nil
   #+:clisp (ext:hash-table-weak-p ht)
   #+:cmu (if (lisp::hash-table-weak-p ht) :key nil)
   #+:openmcl (ccl::hash-table-weak-p ht)
