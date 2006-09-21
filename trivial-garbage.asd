@@ -16,8 +16,8 @@
 (defsystem trivial-garbage
   :description "Portable finalizers, weak hash-tables and weak pointers."
   :author "Luis Oliveira <loliveira@common-lisp.net>"
-  :version "0.13"
-  :licence "MIT"
+  :version "0.14"
+  :licence "Public Domain"
   :components ((:file "trivial-garbage")))
 
 (defmethod perform ((op test-op) (sys (eql (find-system :trivial-garbage))))
