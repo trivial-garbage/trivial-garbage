@@ -149,12 +149,15 @@
   "Returns one of NIL, :KEY, :VALUE, :KEY-OR-VALUE or :KEY-AND-VALUE."
   #-(or :allegro :sbcl :clisp :cmu :openmcl :lispworks)
   (declare (ignore ht))
+  ;; keep this first if any of the other lisps bugously insert a NIL
+  ;; for the returned (values) even when *read-suppress* is NIL (e.g. clisp)
+  #.(if (find :sbcl *features*)
+        (if (find-symbol "HASH-TABLE-WEAKNESS" "SB-EXT")
+            (read-from-string "(sb-ext:hash-table-weakness ht)")
+            nil)
+        (values))
   #+:allegro (cond ((excl:hash-table-weak-keys ht) :key)
                    ((eq (excl:hash-table-values ht) :weak) :value))
-  #+#.(cl:if (cl:find-symbol "HASH-TABLE-WEAKNESS" "SB-EXT") '(and) '(or))
-  (sb-ext:hash-table-weakness ht)
-  #+(and :sbcl #.(cl:if (cl:find-symbol "HASH-TABLE-WEAKNESS" "SB-EXT") '(or) '(and)))
-  nil
   #+:clisp (ext:hash-table-weak-p ht)
   #+:cmu (if (lisp::hash-table-weak-p ht) :key nil)
   #+:openmcl (ccl::hash-table-weak-p ht)
