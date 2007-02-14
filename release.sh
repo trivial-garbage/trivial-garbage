@@ -6,6 +6,9 @@ TARBALL="$TARBALL_NAME.tar.gz"
 SIGNATURE="$TARBALL.asc"
 RELEASE_DIR=${RELEASE_DIR:="public_html/tarballs/"}
 
+echo "Tagging the tree..."
+darcs tag "$VERSION"
+
 echo "Creating distribution..."
 darcs dist -d "$TARBALL_NAME"
 
