@@ -77,9 +77,6 @@
   (apply setup-function args)
   (gc :full t))
 
-;;; CLISP crashes hard on this one. See:
-;;; http://article.gmane.org/gmane.lisp.clisp.general/11028
-#-:clisp
 (deftest finalizers.1
     (progn
       (do-it-to-it #'setup-finalizers 1)
@@ -94,7 +91,6 @@
       (car *finalized?*))
   nil)
 
-#-:clisp
 (deftest finalizers.3
     (progn
       (do-it-to-it #'setup-finalizers 3)

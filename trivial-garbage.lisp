@@ -209,11 +209,18 @@
           (gethash object *finalizers*))
     object)
   #+:clisp
-  (progn
-    (push function (gethash object *finalizers*))
-    (ext:finalize object
-                  (lambda (obj)
-                    (mapc #'funcall (gethash obj *finalizers*))))
+  ;; The CLISP code used to be a bit simpler but we had to workaround
+  ;; a bug regarding the interaction between GC and weak hashtables.
+  ;; See <http://article.gmane.org/gmane.lisp.clisp.general/11028>
+  ;; and <http://article.gmane.org/gmane.lisp.cffi.devel/994>.
+  (multiple-value-bind (finalizers presentp)
+      (gethash object *finalizers* (cons 'finalizers nil))
+    (unless presentp
+      (setf (gethash object *finalizers*) finalizers)
+      (ext:finalize object (lambda (obj)
+                             (declare (ignore obj))
+                             (mapc #'funcall (cdr finalizers)))))
+    (push function (cdr finalizers))
     object)
   #+:openmcl
   (progn
@@ -255,7 +262,12 @@
     (mapc #'excl:unschedule-finalization
           (gethash object *finalizers*))
     (remhash object *finalizers*))
-  #+:clisp (remhash object *finalizers*)
+  #+:clisp
+  (multiple-value-bind (finalizers present-p)
+      (gethash object *finalizers*)
+    (when present-p
+      (setf (cdr finalizers) nil))
+    (remhash object *finalizers*))
   #+:openmcl
   (let ((count (gethash object *finalizers*)))
     (unless (null count)
