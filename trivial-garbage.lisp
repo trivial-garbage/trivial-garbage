@@ -240,9 +240,7 @@
     (ccl:terminate-when-unreachable
      object (lambda (obj) (declare (ignore obj)) (funcall function)))
     ;; store number of finalizers
-    (if (gethash object *finalizers*)
-        (incf (gethash object *finalizers*))
-        (setf (gethash object *finalizers*) 1))
+    (incf (gethash object *finalizers* 0))
     object)
   #+corman
   (flet ((get-finalizers (obj)
