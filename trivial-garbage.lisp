@@ -30,6 +30,7 @@
   #+sbcl (sb-ext:gc :full full)
   #+allegro (excl:gc (not (null full)))
   #+clisp (ext:gc)
+  #+ecl (si:gc t)
   #+openmcl (ccl:gc)
   #+corman (ccl:gc (if full 3 0))
   #+lispworks (hcl:mark-and-sweep (if full 3 0)))
@@ -51,6 +52,7 @@
   #+sbcl (sb-ext:make-weak-pointer object)
   #+cmu (ext:make-weak-pointer object)
   #+clisp (ext:make-weak-pointer object)
+  #+ecl (error "not implemented")
   #+allegro
   (let ((wv (excl:weak-vector 1)))
     (setf (svref wv 0) object)
@@ -72,6 +74,7 @@
   #+sbcl (sb-ext:weak-pointer-p object)
   #+cmu (ext:weak-pointer-p object)
   #+clisp (ext:weak-pointer-p object)
+  #+ecl (error "not implemented")
   #+corman (ccl:weak-pointer-p object))
 
 (defun weak-pointer-value (weak-pointer)
@@ -79,6 +82,7 @@
   #+sbcl (values (sb-ext:weak-pointer-value weak-pointer))
   #+cmu (values (ext:weak-pointer-value weak-pointer))
   #+clisp (values (ext:weak-pointer-value weak-pointer))
+  #+ecl (error "not implemented")
   #+allegro (svref (weak-pointer-pointer weak-pointer) 0)
   #+openmcl (values (gethash weak-pointer *weak-pointers*))
   #+corman (ccl:weak-pointer-obj weak-pointer)
@@ -204,6 +208,13 @@
    accessible when FUNCTION is invoked."
   #+cmu (ext:finalize object function)
   #+sbcl (sb-ext:finalize object function)
+  #+ecl (let ((next-fn (ext:get-finalizer object)))
+          (ext:set-finalizer
+           object (lambda (obj)
+                    (declare (ignore obj))
+                    (funcall function)
+                    (when next-fn
+                      (funcall next-fn nil)))))
   #+allegro
   (progn
     (push (excl:schedule-finalization
@@ -262,6 +273,7 @@
   "Cancels all of OBJECT's finalizers, if any."
   #+cmu (ext:cancel-finalization object)
   #+sbcl (sb-ext:cancel-finalization object)
+  #+ecl (ext:set-finalizer object nil)
   #+allegro
   (progn
     (mapc #'excl:unschedule-finalization
