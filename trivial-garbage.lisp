@@ -168,7 +168,9 @@
 ;;; The fact that SBCL/CMUCL throw away the object *before* running
 ;;; the finalizer is somewhat unfortunate...
 
-#+(or :allegro :clisp :lispworks :openmcl)
+;;; Note: Lispworks can't finalize gensyms.
+
+#+(or allegro clisp lispworks openmcl)
 (defvar *finalizers*
   (cl:make-hash-table :test 'eq
                       #+allegro :weak-keys #+:allegro t
@@ -249,8 +251,11 @@
     object)
   #+lispworks
   (progn
-    (push function (gethash object *finalizers*))
-    (hcl:flag-special-free-action object)
+    (let ((finalizers (gethash object *finalizers*)))
+      (unless finalizers
+        (hcl:flag-special-free-action object))
+      (setf (gethash object *finalizers*)
+            (cons function finalizers)))
     object))
 
 (defun cancel-finalization (object)
