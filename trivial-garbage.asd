@@ -6,12 +6,8 @@
 ;;; <loliveira@common-lisp.net> and is provided with absolutely no
 ;;; warranty.
 
-#-(or :cmu :sbcl :allegro :clisp :openmcl :corman :lispworks)
+#-(or cmu sbcl allegro clisp openmcl corman lispworks ecl)
 (error "Sorry, your Lisp is not supported by trivial-garbage.")
-
-(defpackage #:trivial-garbage-system
-  (:use #:cl #:asdf))
-(in-package #:trivial-garbage-system)
 
 (defsystem trivial-garbage
   :description "Portable finalizers, weak hash-tables and weak pointers."
@@ -21,7 +17,6 @@
   :components ((:file "trivial-garbage")))
 
 (defmethod perform ((op test-op) (sys (eql (find-system :trivial-garbage))))
-  (operate 'load-op :trivial-garbage-tests)
   (operate 'test-op :trivial-garbage-tests))
 
 (defsystem trivial-garbage-tests
@@ -31,6 +26,7 @@
 
 (defmethod perform ((op test-op)
                     (sys (eql (find-system :trivial-garbage-tests))))
-  (funcall (find-symbol (symbol-name '#:do-tests) '#:regression-test)))
+  (operate 'load-op :trivial-garbage-tests)
+  (funcall (find-symbol (string '#:do-tests) '#:rtest)))
 
 ;; vim: ft=lisp et
