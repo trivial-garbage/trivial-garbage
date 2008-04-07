@@ -7,7 +7,8 @@
 ;;; warranty.
 
 (defpackage #:trivial-garbage-tests
-  (:use #:cl #:trivial-garbage #:regression-test))
+  (:use #:cl #:trivial-garbage #:regression-test)
+  (:nicknames #:tg-tests))
 
 (in-package #:trivial-garbage-tests)
 
