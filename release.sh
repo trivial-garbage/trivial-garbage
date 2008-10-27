@@ -73,7 +73,7 @@ if [ -z "$VERSION" ]; then
     done
 
     while true; do
-        echo "Current version is $CURRENT_VERSION. Which will be next one?"
+        echo "Current version is $CURRENT_VERSION. Which will be the next one?"
         for i in $(seq $count); do echo "    $i) ${versions[$i]}"; done
         echo -n "? "
         read choice
@@ -140,8 +140,8 @@ while true; do
     esac
 done
 
-echo "Building and uploading documentation..."
-make -C doc upload-docs
+#echo "Building and uploading documentation..."
+#make -C doc upload-docs
 
 echo "Pushing changes..."
 darcs push
