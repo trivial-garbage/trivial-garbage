@@ -24,7 +24,7 @@
 
 ;;;; Weak Hashtables
 
-#+(or sbcl corman)
+#+(or sbcl corman scl)
 (progn
   (pushnew 'hashtables.weak-key.1 rt::*expected-failures*)
   (pushnew 'hashtables.weak-key.2 rt::*expected-failures*))
@@ -41,7 +41,7 @@
               (hash-table-weakness ht)))
   t :key)
 
-#+(or sbcl cmu corman)
+#+(or sbcl cmu corman scl)
 (pushnew 'hashtables.weak-value.1 rt::*expected-failures*)
 
 (deftest hashtables.weak-value.1

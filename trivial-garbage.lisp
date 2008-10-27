@@ -26,7 +26,7 @@
 (defun gc (&key full verbose)
   "Initiates a garbage collection."
   (declare (ignorable verbose full))
-  #+cmu (ext:gc :verbose verbose :full full)
+  #+(or cmu scl) (ext:gc :verbose verbose :full full)
   #+sbcl (sb-ext:gc :full full)
   #+allegro (excl:gc (not (null full)))
   #+clisp (ext:gc)
@@ -50,7 +50,7 @@
    portability reasons, OBJECT most not be NIL."
   (assert (not (null object)))
   #+sbcl (sb-ext:make-weak-pointer object)
-  #+cmu (ext:make-weak-pointer object)
+  #+(or cmu scl) (ext:make-weak-pointer object)
   #+clisp (ext:make-weak-pointer object)
   #+ecl (error "not implemented")
   #+allegro
@@ -72,7 +72,7 @@
 (defun weak-pointer-p (object)
   "Returns true if OBJECT is a weak pointer and NIL otherwise."
   #+sbcl (sb-ext:weak-pointer-p object)
-  #+cmu (ext:weak-pointer-p object)
+  #+(or cmu scl) (ext:weak-pointer-p object)
   #+clisp (ext:weak-pointer-p object)
   #+ecl (error "not implemented")
   #+corman (ccl:weak-pointer-p object))
@@ -80,7 +80,7 @@
 (defun weak-pointer-value (weak-pointer)
   "If WEAK-POINTER is valid, returns its value. Otherwise, returns NIL."
   #+sbcl (values (sb-ext:weak-pointer-value weak-pointer))
-  #+cmu (values (ext:weak-pointer-value weak-pointer))
+  #+(or cmu scl) (values (ext:weak-pointer-value weak-pointer))
   #+clisp (values (ext:weak-pointer-value weak-pointer))
   #+ecl (error "not implemented")
   #+allegro (svref (weak-pointer-pointer weak-pointer) 0)
@@ -208,7 +208,7 @@
    at OBJECT by closing over it because, in some lisps, OBJECT
    will already have been garbage collected and is therefore not
    accessible when FUNCTION is invoked."
-  #+cmu (ext:finalize object function)
+  #+(or cmu scl) (ext:finalize object function)
   #+sbcl (sb-ext:finalize object function)
   #+ecl (let ((next-fn (ext:get-finalizer object)))
           (ext:set-finalizer
@@ -272,6 +272,7 @@
 (defun cancel-finalization (object)
   "Cancels all of OBJECT's finalizers, if any."
   #+cmu (ext:cancel-finalization object)
+  #+scl (ext:cancel-finalization object nil)
   #+sbcl (sb-ext:cancel-finalization object)
   #+ecl (ext:set-finalizer object nil)
   #+allegro
