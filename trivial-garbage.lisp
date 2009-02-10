@@ -111,18 +111,18 @@
      (error "Your Lisp does not support weak key hash-tables."))
     (:value
      #+allegro :weak
-     #+(or clisp openmcl sbcl lispworks) :value
-     #-(or allegro clisp openmcl sbcl lispworks)
+     #+(or clisp openmcl sbcl lispworks cmu) :value
+     #-(or allegro clisp openmcl sbcl lispworks cmu)
      (error "Your Lisp does not support weak value hash-tables."))
     (:key-or-value
-     #+(or clisp sbcl) :key-or-value
+     #+(or clisp sbcl cmu) :key-or-value
      #+lispworks :either
-     #-(or clisp sbcl lispworks)
+     #-(or clisp sbcl lispworks cmu)
      (error "Your Lisp does not support weak key-or-value hash-tables."))
     (:key-and-value
-     #+(or clisp sbcl) :key-and-value
+     #+(or clisp sbcl cmu) :key-and-value
      #+lispworks :both
-     #-(or clisp sbcl lispworks)
+     #-(or clisp sbcl lispworks cmu)
      (error "Your Lisp does not support weak key-and-value hash-tables."))))
 
 (defun make-weak-hash-table (&rest args &key weakness &allow-other-keys)
