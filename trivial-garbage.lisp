@@ -165,7 +165,8 @@
   #+allegro (cond ((excl:hash-table-weak-keys ht) :key)
                    ((eq (excl:hash-table-values ht) :weak) :value))
   #+clisp (ext:hash-table-weak-p ht)
-  #+cmu (if (lisp::hash-table-weak-p ht) :key nil)
+  #+cmu (let ((weakness (lisp::hash-table-weak-p ht)))
+          (if (eq t weakness) :key weakness))
   #+openmcl (ccl::hash-table-weak-p ht)
   #+lispworks (system::hash-table-weak-kind ht))
 
