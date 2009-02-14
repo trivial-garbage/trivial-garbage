@@ -41,7 +41,7 @@
               (hash-table-weakness ht)))
   t :key)
 
-#+(or sbcl cmu corman scl)
+#+(or sbcl corman scl)
 (pushnew 'hashtables.weak-value.1 rt::*expected-failures*)
 
 (deftest hashtables.weak-value.1
