@@ -102,42 +102,61 @@
   #+allegro (case weakness (:key :weak-keys) (:value :values))
   #+cmu :weak-p)
 
-(defun weakness-keyword-opt (weakness)
+(defvar *weakness-warnings* '()
+  "List of weaknesses that have already been warned about this
+  session.  Used by `weakness-missing'.")
+
+(defun weakness-missing (weakness errorp)
+  "Signal an error or warning, depending on ERRORP, about lack of Lisp
+support for WEAKNESS."
+  (cond (errorp
+         (error "Your Lisp does not support weak ~(~A~) hash-tables."
+                weakness))
+        ((member weakness *weakness-warnings*) nil)
+        (t (push weakness *weakness-warnings*)
+         (warn "Your Lisp does not support weak ~(~A~) hash-tables."
+               weakness))))
+
+(defun weakness-keyword-opt (weakness errorp)
   (ecase weakness
     (:key
      #+(or lispworks sbcl clisp openmcl) :key
      #+(or allegro cmu) t
      #-(or lispworks sbcl clisp openmcl allegro cmu)
-     (error "Your Lisp does not support weak key hash-tables."))
+     (weakness-missing weakness errorp))
     (:value
      #+allegro :weak
      #+(or clisp openmcl sbcl lispworks cmu) :value
      #-(or allegro clisp openmcl sbcl lispworks cmu)
-     (error "Your Lisp does not support weak value hash-tables."))
+     (weakness-missing weakness errorp))
     (:key-or-value
      #+(or clisp sbcl cmu) :key-or-value
      #+lispworks :either
      #-(or clisp sbcl lispworks cmu)
-     (error "Your Lisp does not support weak key-or-value hash-tables."))
+     (weakness-missing weakness errorp))
     (:key-and-value
      #+(or clisp sbcl cmu) :key-and-value
      #+lispworks :both
      #-(or clisp sbcl lispworks cmu)
-     (error "Your Lisp does not support weak key-and-value hash-tables."))))
+     (weakness-missing weakness errorp))))
 
-(defun make-weak-hash-table (&rest args &key weakness &allow-other-keys)
+(defun make-weak-hash-table (&rest args &key weakness (weakness-matters t)
+                             &allow-other-keys)
   "Returns a new weak hash table. In addition to the standard arguments
-   accepted by CL:MAKE-HASH-TABLE, this function an extra keyword :WEAKNESS
-   that determines the kind of weak table it should create. WEAKNESS can be
-   one of :KEY, :VALUE, :KEY-OR-VALUE, :KEY-AND-VALUE.
+   accepted by CL:MAKE-HASH-TABLE, this function adds extra
+   keywords: :WEAKNESS being the kind of weak table it should create, and
+   :WEAKNESS-MATTERS being whether an error should be signalled when that
+   weakness isn't available (the default is to signal an error).  WEAKNESS
+   can be one of :KEY, :VALUE, :KEY-OR-VALUE, :KEY-AND-VALUE.
 
    TG::MAKE-HASH-TABLE is available as an alias for this function should you
    wish to import it into your package and shadow CL:MAKE-HASH-TABLE."
   (remf args :weakness)
+  (remf args :weakness-matters)
   (if weakness
       (apply #'cl:make-hash-table
              (weakness-keyword-arg weakness)
-             (weakness-keyword-opt weakness)
+             (weakness-keyword-opt weakness weakness-matters)
              #+openmcl :test #+openmcl 'eq
              args)
       (apply #'cl:make-hash-table args)))
