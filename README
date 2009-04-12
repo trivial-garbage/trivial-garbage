@@ -21,6 +21,7 @@ Documentation is generated with the code below and is available at
     (dolist (sym syms)
       (format t "<p>&mdash; Function: <strong>tg:~A</strong>" (snd sym))
       (format t "~{ <var>~A</var>~}</p>~%"
-                (mapcar #'snd (sb-introspect:function-arglist sym)))
+              (loop for arg in (sb-introspect:function-arglist sym) collect
+                (if (listp arg) (mapcar #'snd arg) (snd arg))))
       (format t "<blockquote><p>~A</p></blockquote>~%~%"
-                (documentation sym 'function))))))
+              (documentation sym 'function)))))
