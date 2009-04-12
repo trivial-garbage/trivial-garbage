@@ -138,6 +138,7 @@
       (apply #'cl:make-hash-table
              (weakness-keyword-arg weakness)
              (weakness-keyword-opt weakness)
+             #+openmcl :test #+openmcl 'eq
              args)
       (apply #'cl:make-hash-table args)))
 
