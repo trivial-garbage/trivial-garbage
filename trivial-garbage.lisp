@@ -52,7 +52,7 @@
   #+sbcl (sb-ext:make-weak-pointer object)
   #+(or cmu scl) (ext:make-weak-pointer object)
   #+clisp (ext:make-weak-pointer object)
-  #+ecl (error "not implemented")
+  #+ecl (ext:make-weak-pointer object)
   #+allegro
   (let ((wv (excl:weak-vector 1)))
     (setf (svref wv 0) object)
@@ -74,7 +74,7 @@
   #+sbcl (sb-ext:weak-pointer-p object)
   #+(or cmu scl) (ext:weak-pointer-p object)
   #+clisp (ext:weak-pointer-p object)
-  #+ecl (error "not implemented")
+  #+ecl (typep object 'ext:weak-pointer)
   #+corman (ccl:weak-pointer-p object))
 
 (defun weak-pointer-value (weak-pointer)
@@ -82,7 +82,7 @@
   #+sbcl (values (sb-ext:weak-pointer-value weak-pointer))
   #+(or cmu scl) (values (ext:weak-pointer-value weak-pointer))
   #+clisp (values (ext:weak-pointer-value weak-pointer))
-  #+ecl (error "not implemented")
+  #+ecl (values (ext:weak-pointer-value weak-pointer))
   #+allegro (svref (weak-pointer-pointer weak-pointer) 0)
   #+openmcl (values (gethash weak-pointer *weak-pointers*))
   #+corman (ccl:weak-pointer-obj weak-pointer)
