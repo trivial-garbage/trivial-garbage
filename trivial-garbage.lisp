@@ -118,6 +118,7 @@ support for WEAKNESS."
                weakness))))
 
 (defun weakness-keyword-opt (weakness errorp)
+  (declare (ignorable errorp))
   (ecase weakness
     (:key
      #+(or lispworks sbcl clisp openmcl) :key
