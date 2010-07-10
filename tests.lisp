@@ -92,6 +92,9 @@
   (voodoo (format nil "(setq *result* (test-finalizers-aux ~S ~S))"
                   count remove))
   (voodoo "(gc :full t)")
+  ;; Normally done by a background thread every 0.3 sec:
+  #+openmcl (ccl::drain-termination-queue)
+  ;; (an alternative is to sleep a bit)
   (voodoo "(car *result*)"))
 
 (deftest finalizers.1
