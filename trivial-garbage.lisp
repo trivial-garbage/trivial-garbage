@@ -155,11 +155,13 @@ support for WEAKNESS."
   (remf args :weakness)
   (remf args :weakness-matters)
   (if weakness
-      (apply #'cl:make-hash-table
-             (weakness-keyword-arg weakness)
-             (weakness-keyword-opt weakness weakness-matters)
-             #+openmcl :test #+openmcl 'eq
-             args)
+      (let ((arg (weakness-keyword-arg weakness))
+            (opt (weakness-keyword-opt weakness weakness-matters)))
+        (apply #'cl:make-hash-table
+               #+openmcl :test #+openmcl 'eq
+               (if arg
+                   (list* arg opt args)
+                   args)))
       (apply #'cl:make-hash-table args)))
 
 ;;; If you want to use this function to override CL:MAKE-HASH-TABLE,
