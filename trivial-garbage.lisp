@@ -142,6 +142,7 @@ support for WEAKNESS."
      (weakness-missing weakness errorp))))
 
 (defun make-weak-hash-table (&rest args &key weakness (weakness-matters t)
+                             #+openmcl (test #'eql)
                              &allow-other-keys)
   "Returns a new weak hash table. In addition to the standard arguments
    accepted by CL:MAKE-HASH-TABLE, this function adds extra
@@ -158,7 +159,7 @@ support for WEAKNESS."
       (let ((arg (weakness-keyword-arg weakness))
             (opt (weakness-keyword-opt weakness weakness-matters)))
         (apply #'cl:make-hash-table
-               #+openmcl :test #+openmcl 'eq
+               #+openmcl :test #+openmcl (if (eq opt :key) #'eq test)
                (if arg
                    (list* arg opt args)
                    args)))
