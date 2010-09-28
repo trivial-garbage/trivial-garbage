@@ -12,7 +12,7 @@
 (defsystem trivial-garbage
   :description "Portable finalizers, weak hash-tables and weak pointers."
   :author "Luis Oliveira <loliveira@common-lisp.net>"
-  :version "0.18"
+  :version "0.19"
   :licence "Public Domain"
   :components ((:file "trivial-garbage")))
 
