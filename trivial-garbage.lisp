@@ -33,7 +33,7 @@
   #+ecl (si:gc t)
   #+openmcl (ccl:gc)
   #+corman (ccl:gc (if full 3 0))
-  #+lispworks (hcl:mark-and-sweep (if full 3 0)))
+  #+lispworks (hcl:gc-generation (if full t 0)))
 
 ;;;; Weak Pointers
 
@@ -63,8 +63,7 @@
     wp)
   #+corman (ccl:make-weak-pointer object)
   #+lispworks
-  (let ((array (make-array 1)))
-    (hcl:set-array-weak array t)
+  (let ((array (make-array 1 :weak t)))
     (setf (svref array 0) object)
     (%make-weak-pointer :pointer array)))
 
