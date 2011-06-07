@@ -29,7 +29,7 @@
   #+(or cmu scl) (ext:gc :verbose verbose :full full)
   #+sbcl (sb-ext:gc :full full)
   #+allegro (excl:gc (not (null full)))
-  #+clisp (ext:gc)
+  #+(or abcl clisp) (ext:gc)
   #+ecl (si:gc t)
   #+openmcl (ccl:gc)
   #+corman (ccl:gc (if full 3 0))
@@ -47,11 +47,12 @@
 
 (defun make-weak-pointer (object)
   "Creates a new weak pointer which points to OBJECT. For
-   portability reasons, OBJECT most not be NIL."
+   portability reasons, OBJECT must not be NIL."
   (assert (not (null object)))
   #+sbcl (sb-ext:make-weak-pointer object)
   #+(or cmu scl) (ext:make-weak-pointer object)
   #+clisp (ext:make-weak-pointer object)
+  #+abcl (ext:make-weak-reference object)
   #+ecl (ext:make-weak-pointer object)
   #+allegro
   (let ((wv (excl:weak-vector 1)))
@@ -73,6 +74,7 @@
   #+sbcl (sb-ext:weak-pointer-p object)
   #+(or cmu scl) (ext:weak-pointer-p object)
   #+clisp (ext:weak-pointer-p object)
+  #+abcl (typep object 'ext:weak-reference)
   #+ecl (typep object 'ext:weak-pointer)
   #+corman (ccl:weak-pointer-p object))
 
@@ -81,6 +83,7 @@
   #+sbcl (values (sb-ext:weak-pointer-value weak-pointer))
   #+(or cmu scl) (values (ext:weak-pointer-value weak-pointer))
   #+clisp (values (ext:weak-pointer-value weak-pointer))
+  #+abcl (values (ext:weak-reference-value weak-pointer))
   #+ecl (values (ext:weak-pointer-value weak-pointer))
   #+allegro (svref (weak-pointer-pointer weak-pointer) 0)
   #+openmcl (values (gethash weak-pointer *weak-pointers*))
@@ -95,7 +98,7 @@
 
 (defun weakness-keyword-arg (weakness)
   (declare (ignorable weakness))
-  #+sbcl :weakness
+  #+(or sbcl abcl) :weakness
   #+(or clisp openmcl) :weak
   #+lispworks :weak-kind
   #+allegro (case weakness (:key :weak-keys) (:value :values))
@@ -120,24 +123,24 @@ support for WEAKNESS."
   (declare (ignorable errorp))
   (ecase weakness
     (:key
-     #+(or lispworks sbcl clisp openmcl) :key
+     #+(or lispworks sbcl abcl clisp openmcl) :key
      #+(or allegro cmu) t
-     #-(or lispworks sbcl clisp openmcl allegro cmu)
+     #-(or lispworks sbcl abcl clisp openmcl allegro cmu)
      (weakness-missing weakness errorp))
     (:value
      #+allegro :weak
-     #+(or clisp openmcl sbcl lispworks cmu) :value
-     #-(or allegro clisp openmcl sbcl lispworks cmu)
+     #+(or clisp openmcl sbcl abcl lispworks cmu) :value
+     #-(or allegro clisp openmcl sbcl abcl lispworks cmu)
      (weakness-missing weakness errorp))
     (:key-or-value
-     #+(or clisp sbcl cmu) :key-or-value
+     #+(or clisp sbcl abcl cmu) :key-or-value
      #+lispworks :either
-     #-(or clisp sbcl lispworks cmu)
+     #-(or clisp sbcl abcl lispworks cmu)
      (weakness-missing weakness errorp))
     (:key-and-value
-     #+(or clisp sbcl cmu) :key-and-value
+     #+(or clisp abcl sbcl cmu) :key-and-value
      #+lispworks :both
-     #-(or clisp sbcl lispworks cmu)
+     #-(or clisp sbcl abcl lispworks cmu)
      (weakness-missing weakness errorp))))
 
 (defun make-weak-hash-table (&rest args &key weakness (weakness-matters t)
@@ -176,7 +179,7 @@ support for WEAKNESS."
 
 (defun hash-table-weakness (ht)
   "Returns one of NIL, :KEY, :VALUE, :KEY-OR-VALUE or :KEY-AND-VALUE."
-  #-(or allegro sbcl clisp cmu openmcl lispworks)
+  #-(or allegro sbcl abcl clisp cmu openmcl lispworks)
   (declare (ignore ht))
   ;; keep this first if any of the other lisps bugously insert a NIL
   ;; for the returned (values) even when *read-suppress* is NIL (e.g. clisp)
@@ -185,6 +188,7 @@ support for WEAKNESS."
             (read-from-string "(sb-ext:hash-table-weakness ht)")
             nil)
         (values))
+  #+abcl (sys:hash-table-weakness ht)
   #+allegro (cond ((excl:hash-table-weak-keys ht) :key)
                    ((eq (excl:hash-table-values ht) :weak) :value))
   #+clisp (ext:hash-table-weak-p ht)
@@ -234,6 +238,7 @@ support for WEAKNESS."
    accessible when FUNCTION is invoked."
   #+(or cmu scl) (ext:finalize object function)
   #+sbcl (sb-ext:finalize object function)
+  #+abcl (ext:finalize object function)
   #+ecl (let ((next-fn (ext:get-finalizer object)))
           (ext:set-finalizer
            object (lambda (obj)
@@ -298,6 +303,7 @@ support for WEAKNESS."
   #+cmu (ext:cancel-finalization object)
   #+scl (ext:cancel-finalization object nil)
   #+sbcl (sb-ext:cancel-finalization object)
+  #+abcl (ext:cancel-finalization object)
   #+ecl (ext:set-finalizer object nil)
   #+allegro
   (progn
