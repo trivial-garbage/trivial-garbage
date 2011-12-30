@@ -98,7 +98,7 @@
 
 (defun weakness-keyword-arg (weakness)
   (declare (ignorable weakness))
-  #+(or sbcl abcl) :weakness
+  #+(or sbcl abcl ecl-weak-hash) :weakness
   #+(or clisp openmcl) :weak
   #+lispworks :weak-kind
   #+allegro (case weakness (:key :weak-keys) (:value :values))
@@ -123,14 +123,14 @@ support for WEAKNESS."
   (declare (ignorable errorp))
   (ecase weakness
     (:key
-     #+(or lispworks sbcl abcl clisp openmcl) :key
+     #+(or lispworks sbcl abcl clisp openmcl ecl-weak-hash) :key
      #+(or allegro cmu) t
-     #-(or lispworks sbcl abcl clisp openmcl allegro cmu)
+     #-(or lispworks sbcl abcl clisp openmcl allegro cmu ecl-weak-hash)
      (weakness-missing weakness errorp))
     (:value
      #+allegro :weak
-     #+(or clisp openmcl sbcl abcl lispworks cmu) :value
-     #-(or allegro clisp openmcl sbcl abcl lispworks cmu)
+     #+(or clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash) :value
+     #-(or allegro clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash)
      (weakness-missing weakness errorp))
     (:key-or-value
      #+(or clisp sbcl abcl cmu) :key-or-value
@@ -138,9 +138,9 @@ support for WEAKNESS."
      #-(or clisp sbcl abcl lispworks cmu)
      (weakness-missing weakness errorp))
     (:key-and-value
-     #+(or clisp abcl sbcl cmu) :key-and-value
+     #+(or clisp abcl sbcl cmu ecl-weak-hash) :key-and-value
      #+lispworks :both
-     #-(or clisp sbcl abcl lispworks cmu)
+     #-(or clisp sbcl abcl lispworks cmu ecl-weak-hash)
      (weakness-missing weakness errorp))))
 
 (defun make-weak-hash-table (&rest args &key weakness (weakness-matters t)
@@ -189,6 +189,7 @@ support for WEAKNESS."
             nil)
         (values))
   #+abcl (sys:hash-table-weakness ht)
+  #+ecl-weak-hash (ext:hash-table-weakness ht)
   #+allegro (cond ((excl:hash-table-weak-keys ht) :key)
                    ((eq (excl:hash-table-values ht) :weak) :value))
   #+clisp (ext:hash-table-weak-p ht)
