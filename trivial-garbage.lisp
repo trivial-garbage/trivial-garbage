@@ -17,14 +17,61 @@
            #:make-weak-hash-table
            #:hash-table-weakness
            #:finalize
-           #:cancel-finalization))
+           #:cancel-finalization)
+  (:documentation
+   "@a[http://common-lisp.net/project/trivial-garbage]{trivial-garbage}
+    provides a portable API to finalizers, weak hash-tables and weak
+    pointers on all major implementations of the Common Lisp
+    programming language. For a good introduction to these
+    data-structures, have a look at
+    @a[http://www.haible.de/bruno/papers/cs/weak/WeakDatastructures-writeup.html]{Weak
+    References: Data Types and Implementation} by Bruno Haible.
+
+    Source code is available at
+    @a[https://github.com/trivial-garbage/trivial-garbage]{github},
+    which you are welcome to use for submitting patches and/or
+    @a[https://github.com/trivial-garbage/trivial-garbage/issues]{bug
+    reports}. Discussion takes place on
+    @a[http://lists.common-lisp.net/cgi-bin/mailman/listinfo/trivial-garbage-devel]{trivial-garbage-devel at common-lisp.net}.
+
+    @begin[Weak Pointers]{section}
+    A @em{weak pointer} holds an object in a way that does not prevent
+    it from being reclaimed by the garbage collector.  An object
+    referenced only by weak pointers is considered unreachable (or
+    \"weakly reachable\") and so may be collected at any time. When
+    that happens, the weak pointer's value becomes @code{nil}.
+
+    @aboutfun{make-weak-pointer}
+    @aboutfun{weak-pointer-value}
+    @aboutfun{weak-pointer-p}
+    @end{section}
+
+    @begin[Weak Hash-Tables]{section}
+    A @em{weak hash-table} is one that weakly references its keys
+    and/or values. When both key and value are unreachable (or weakly
+    reachable) that pair is reclaimed by the garbage collector.
+
+    @aboutfun{make-weak-hash-table}
+    @aboutfun{hash-table-weakness}
+    @end{section}
+
+    @begin[Finalizers]{section}
+    A @em{finalizer} is a hook that is executed after a given object
+    has been reclaimed by the garbage collector.
+
+    @aboutfun{finalize}
+    @aboutfun{cancel-finalization}
+    @end{section}"))
 
 (in-package #:trivial-garbage)
 
 ;;;; GC
 
 (defun gc (&key full verbose)
-  "Initiates a garbage collection."
+  "Initiates a garbage collection. @code{full} forces the collection
+   of all generations, when applicable. When @code{verbose} is
+   @em{true}, diagnostic information about the collection is printed
+   if possible."
   (declare (ignorable verbose full))
   #+(or cmu scl) (ext:gc :verbose verbose :full full)
   #+sbcl (sb-ext:gc :full full)
@@ -46,8 +93,8 @@
   #-openmcl pointer)
 
 (defun make-weak-pointer (object)
-  "Creates a new weak pointer which points to OBJECT. For
-   portability reasons, OBJECT must not be NIL."
+  "Creates a new weak pointer which points to @code{object}. For
+   portability reasons, @code{object} must not be @code{nil}."
   (assert (not (null object)))
   #+sbcl (sb-ext:make-weak-pointer object)
   #+(or cmu scl) (ext:make-weak-pointer object)
@@ -70,7 +117,8 @@
 
 #-(or allegro openmcl lispworks)
 (defun weak-pointer-p (object)
-  "Returns true if OBJECT is a weak pointer and NIL otherwise."
+  "Returns @em{true} if @code{object} is a weak pointer and @code{nil}
+   otherwise."
   #+sbcl (sb-ext:weak-pointer-p object)
   #+(or cmu scl) (ext:weak-pointer-p object)
   #+clisp (ext:weak-pointer-p object)
@@ -79,7 +127,8 @@
   #+corman (ccl:weak-pointer-p object))
 
 (defun weak-pointer-value (weak-pointer)
-  "If WEAK-POINTER is valid, returns its value. Otherwise, returns NIL."
+  "If @code{weak-pointer} is valid, returns its value. Otherwise,
+   returns @code{nil}."
   #+sbcl (values (sb-ext:weak-pointer-value weak-pointer))
   #+(or cmu scl) (values (ext:weak-pointer-value weak-pointer))
   #+clisp (values (ext:weak-pointer-value weak-pointer))
@@ -106,11 +155,11 @@
 
 (defvar *weakness-warnings* '()
   "List of weaknesses that have already been warned about this
-  session.  Used by `weakness-missing'.")
+   session.  Used by `weakness-missing'.")
 
 (defun weakness-missing (weakness errorp)
   "Signal an error or warning, depending on ERRORP, about lack of Lisp
-support for WEAKNESS."
+   support for WEAKNESS."
   (cond (errorp
          (error "Your Lisp does not support weak ~(~A~) hash-tables."
                 weakness))
@@ -146,15 +195,17 @@ support for WEAKNESS."
 (defun make-weak-hash-table (&rest args &key weakness (weakness-matters t)
                              #+openmcl (test #'eql)
                              &allow-other-keys)
-  "Returns a new weak hash table. In addition to the standard arguments
-   accepted by CL:MAKE-HASH-TABLE, this function adds extra
-   keywords: :WEAKNESS being the kind of weak table it should create, and
-   :WEAKNESS-MATTERS being whether an error should be signalled when that
-   weakness isn't available (the default is to signal an error).  WEAKNESS
-   can be one of :KEY, :VALUE, :KEY-OR-VALUE, :KEY-AND-VALUE.
+  "Returns a new weak hash table. In addition to the standard
+   arguments accepted by @code{cl:make-hash-table}, this function adds
+   extra keywords: @code{:weakness} being the kind of weak table it
+   should create, and @code{:weakness-matters} being whether an error
+   should be signalled when that weakness isn't available (the default
+   is to signal an error).  @code{weakness} can be one of @code{:key},
+   @code{:value}, @code{:key-or-value}, @code{:key-and-value}.
 
-   TG::MAKE-HASH-TABLE is available as an alias for this function should you
-   wish to import it into your package and shadow CL:MAKE-HASH-TABLE."
+   @code{tg::make-hash-table} is available as an alias for this
+   function should you wish to import it into your package and shadow
+   @code{cl:make-hash-table}."
   (remf args :weakness)
   (remf args :weakness-matters)
   (if weakness
@@ -178,7 +229,8 @@ support for WEAKNESS."
   (apply #'make-weak-hash-table args))
 
 (defun hash-table-weakness (ht)
-  "Returns one of NIL, :KEY, :VALUE, :KEY-OR-VALUE or :KEY-AND-VALUE."
+  "Returns one of @code{nil}, @code{:key}, @code{:value},
+   @code{:key-or-value} or @code{:key-and-value}."
   #-(or allegro sbcl abcl clisp cmu openmcl lispworks)
   (declare (ignore ht))
   ;; keep this first if any of the other lisps bugously insert a NIL
@@ -199,9 +251,6 @@ support for WEAKNESS."
   #+lispworks (system::hash-table-weak-kind ht))
 
 ;;;; Finalizers
-
-;;; The fact that SBCL/CMUCL throw away the object *before* running
-;;; the finalizer is somewhat unfortunate...
 
 ;;; Note: Lispworks can't finalize gensyms.
 
@@ -230,13 +279,13 @@ support for WEAKNESS."
         (mapc #'funcall finalizers)))))
 
 (defun finalize (object function)
-  "Pushes a new FUNCTION to the OBJECT's list of
-   finalizers. FUNCTION should take no arguments. Returns OBJECT.
+  "Pushes a new @code{function} to the @code{object}'s list of
+   finalizers. @code{function} should take no arguments. Returns
+   @code{object}.
 
-   For portability reasons, FUNCTION should not attempt to look
-   at OBJECT by closing over it because, in some lisps, OBJECT
-   will already have been garbage collected and is therefore not
-   accessible when FUNCTION is invoked."
+   @b{Note:} @code{function} should not attempt to look at
+   @code{object} by closing over it because that will prevent it from
+   being garbage collected."
   #+(or cmu scl) (ext:finalize object function)
   #+sbcl (sb-ext:finalize object function)
   #+abcl (ext:finalize object function)
@@ -300,7 +349,7 @@ support for WEAKNESS."
     object))
 
 (defun cancel-finalization (object)
-  "Cancels all of OBJECT's finalizers, if any."
+  "Cancels all of @code{object}'s finalizers, if any."
   #+cmu (ext:cancel-finalization object)
   #+scl (ext:cancel-finalization object nil)
   #+sbcl (sb-ext:cancel-finalization object)

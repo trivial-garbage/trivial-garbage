@@ -28,5 +28,3 @@
                     (sys (eql (find-system :trivial-garbage-tests))))
   (operate 'load-op :trivial-garbage-tests)
   (funcall (find-symbol (string '#:do-tests) '#:rtest)))
-
-;; vim: ft=lisp et
