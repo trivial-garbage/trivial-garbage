@@ -203,6 +203,12 @@
    is to signal an error).  @code{weakness} can be one of @code{:key},
    @code{:value}, @code{:key-or-value}, @code{:key-and-value}.
 
+   If @code{weakness} is @code{:key} or @code{:value}, an entry is
+   kept as long as its key or value is reachable, respectively. If
+   @code{weakness} is @code{:key-or-value} or @code{:key-and-value},
+   an entry is kept if either or both of its key and value are
+   reachable, respectively.
+
    @code{tg::make-hash-table} is available as an alias for this
    function should you wish to import it into your package and shadow
    @code{cl:make-hash-table}."
