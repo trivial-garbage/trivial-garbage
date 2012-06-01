@@ -6,6 +6,8 @@
 ;;; <loliveira@common-lisp.net> and is provided with absolutely no
 ;;; warranty.
 
+#+xcvb (module ())
+
 (defpackage #:trivial-garbage
   (:use #:cl)
   (:shadow #:make-hash-table)
