@@ -24,10 +24,18 @@
 
 ;;;; Weak Hashtables
 
-#+(or sbcl corman scl)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun sbcl-without-weak-hash-tables-p ()
+    (if (and (find :sbcl *features*)
+             (not (find-symbol "HASH-TABLE-WEAKNESS" "SB-EXT")))
+        '(:and)
+        '(:or))))
+
+#+(or corman scl #.(tg-tests::sbcl-doesnt-support-weak-hash-tables-p))
 (progn
   (pushnew 'hashtables.weak-key.1 rt::*expected-failures*)
-  (pushnew 'hashtables.weak-key.2 rt::*expected-failures*))
+  (pushnew 'hashtables.weak-key.2 rt::*expected-failures*)
+  (pushnew 'hashtables.weak-value.1 rt::*expected-failures*))
 
 (deftest hashtables.weak-key.1
     (let ((ht (make-weak-hash-table :weakness :key)))
@@ -40,9 +48,6 @@
       (values (hash-table-p ht)
               (hash-table-weakness ht)))
   t :key)
-
-#+(or sbcl corman scl)
-(pushnew 'hashtables.weak-value.1 rt::*expected-failures*)
 
 (deftest hashtables.weak-value.1
     (let ((ht (make-weak-hash-table :weakness :value)))
