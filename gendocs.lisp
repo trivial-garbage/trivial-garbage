@@ -1,6 +1,7 @@
 (in-package :cl-user)
 
 (asdf:load-system :atdoc)
+(asdf:load-system :trivial-garbage)
 
 (let* ((base (asdf:component-pathname (asdf:find-system :trivial-garbage)))
        (output-directory (merge-pathnames "doc/" base))
