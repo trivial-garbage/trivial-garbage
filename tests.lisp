@@ -31,7 +31,7 @@
         '(:and)
         '(:or))))
 
-#+(or corman scl #.(tg-tests::sbcl-doesnt-support-weak-hash-tables-p))
+#+(or corman scl #.(tg-tests::sbcl-without-weak-hash-tables-p))
 (progn
   (pushnew 'hashtables.weak-key.1 rt::*expected-failures*)
   (pushnew 'hashtables.weak-key.2 rt::*expected-failures*)
