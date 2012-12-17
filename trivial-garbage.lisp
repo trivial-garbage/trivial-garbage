@@ -239,7 +239,8 @@
 (defun hash-table-weakness (ht)
   "Returns one of @code{nil}, @code{:key}, @code{:value},
    @code{:key-or-value} or @code{:key-and-value}."
-  #-(or allegro sbcl abcl clisp cmu openmcl lispworks)
+  #-(or allegro sbcl abcl clisp cmu openmcl lispworks
+        ecl-weak-hash)
   (declare (ignore ht))
   ;; keep this first if any of the other lisps bugously insert a NIL
   ;; for the returned (values) even when *read-suppress* is NIL (e.g. clisp)
