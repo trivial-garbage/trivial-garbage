@@ -34,7 +34,13 @@
     which you are welcome to use for submitting patches and/or
     @a[https://github.com/trivial-garbage/trivial-garbage/issues]{bug
     reports}. Discussion takes place on
-    @a[http://lists.common-lisp.net/cgi-bin/mailman/listinfo/trivial-garbage-devel]{trivial-garbage-devel at common-lisp.net}.
+    @a[http://lists.common-lisp.net/cgi-bin/mailman/listinfo/trivial-garbage-devel]{trivial-garbage-devel
+    at common-lisp.net}.
+
+    @a[http://common-lisp.net/project/trivial-garbage/releases/]{Tarball
+    releases} are available, but the easiest way to install this
+    library is via @a[http://www.quicklisp.org/]{Quicklisp}:
+    @code{(ql:quickload :trivial-garbage)}.
 
     @begin[Weak Pointers]{section}
     A @em{weak pointer} holds an object in a way that does not prevent
