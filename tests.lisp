@@ -8,9 +8,16 @@
 
 (defpackage #:trivial-garbage-tests
   (:use #:cl #:trivial-garbage #:regression-test)
-  (:nicknames #:tg-tests))
+  (:nicknames #:tg-tests)
+  (:export #:run))
 
 (in-package #:trivial-garbage-tests)
+
+(defun run ()
+  (let ((*package* (find-package :trivial-garbage-tests)))
+    (do-tests)
+    (null (set-difference (regression-test:pending-tests)
+                          rtest::*expected-failures*))))
 
 ;;;; Weak Pointers
 
