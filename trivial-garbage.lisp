@@ -88,7 +88,9 @@
   #+ecl (si:gc t)
   #+openmcl (ccl:gc)
   #+corman (ccl:gc (if full 3 0))
-  #+lispworks (hcl:gc-generation (if full t 0)))
+  #+lispworks (hcl:gc-generation (if full t 0))
+  #+clasp (gctools:garbage-collect)
+  )
 
 ;;;; Weak Pointers
 
@@ -121,7 +123,9 @@
   #+lispworks
   (let ((array (make-array 1 :weak t)))
     (setf (svref array 0) object)
-    (%make-weak-pointer :pointer array)))
+    (%make-weak-pointer :pointer array))
+  #+clasp (core:make-weak-pointer object)
+  )
 
 #-(or allegro openmcl lispworks)
 (defun weak-pointer-p (object)
@@ -132,7 +136,8 @@
   #+clisp (ext:weak-pointer-p object)
   #+abcl (typep object 'ext:weak-reference)
   #+ecl (typep object 'ext:weak-pointer)
-  #+corman (ccl:weak-pointer-p object))
+  #+corman (ccl:weak-pointer-p object)
+  #+clasp (core:weak-pointer-valid object))
 
 (defun weak-pointer-value (weak-pointer)
   "If @code{weak-pointer} is valid, returns its value. Otherwise,
@@ -145,7 +150,8 @@
   #+allegro (svref (weak-pointer-pointer weak-pointer) 0)
   #+openmcl (values (gethash weak-pointer *weak-pointers*))
   #+corman (ccl:weak-pointer-obj weak-pointer)
-  #+lispworks (svref (weak-pointer-pointer weak-pointer) 0))
+  #+lispworks (svref (weak-pointer-pointer weak-pointer) 0)
+  #+clasp (core:weak-pointer-value weak-pointer))
 
 ;;;; Weak Hash-tables
 
@@ -159,7 +165,8 @@
   #+(or clisp openmcl) :weak
   #+lispworks :weak-kind
   #+allegro (case weakness (:key :weak-keys) (:value :values))
-  #+cmu :weak-p)
+  #+cmu :weak-p
+  #+clasp :weakness)
 
 (defvar *weakness-warnings* '()
   "List of weaknesses that have already been warned about this
@@ -182,22 +189,23 @@
     (:key
      #+(or lispworks sbcl abcl clisp openmcl ecl-weak-hash) :key
      #+(or allegro cmu) t
-     #-(or lispworks sbcl abcl clisp openmcl allegro cmu ecl-weak-hash)
+     #+clasp :key
+     #-(or lispworks sbcl abcl clisp openmcl allegro cmu ecl-weak-hash clasp)
      (weakness-missing weakness errorp))
     (:value
      #+allegro :weak
      #+(or clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash) :value
-     #-(or allegro clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash)
+     #-(or allegro clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash clasp)
      (weakness-missing weakness errorp))
     (:key-or-value
      #+(or clisp sbcl abcl cmu) :key-or-value
      #+lispworks :either
-     #-(or clisp sbcl abcl lispworks cmu)
+     #-(or clisp sbcl abcl lispworks cmu clasp)
      (weakness-missing weakness errorp))
     (:key-and-value
      #+(or clisp abcl sbcl cmu ecl-weak-hash) :key-and-value
      #+lispworks :both
-     #-(or clisp sbcl abcl lispworks cmu ecl-weak-hash)
+     #-(or clisp sbcl abcl lispworks cmu ecl-weak-hash clasp)
      (weakness-missing weakness errorp))))
 
 (defun make-weak-hash-table (&rest args &key weakness (weakness-matters t)
@@ -246,7 +254,7 @@
   "Returns one of @code{nil}, @code{:key}, @code{:value},
    @code{:key-or-value} or @code{:key-and-value}."
   #-(or allegro sbcl abcl clisp cmu openmcl lispworks
-        ecl-weak-hash)
+        ecl-weak-hash clasp)
   (declare (ignore ht))
   ;; keep this first if any of the other lisps bugously insert a NIL
   ;; for the returned (values) even when *read-suppress* is NIL (e.g. clisp)
@@ -258,24 +266,26 @@
   #+abcl (sys:hash-table-weakness ht)
   #+ecl-weak-hash (ext:hash-table-weakness ht)
   #+allegro (cond ((excl:hash-table-weak-keys ht) :key)
-                   ((eq (excl:hash-table-values ht) :weak) :value))
+                  ((eq (excl:hash-table-values ht) :weak) :value))
   #+clisp (ext:hash-table-weak-p ht)
   #+cmu (let ((weakness (lisp::hash-table-weak-p ht)))
           (if (eq t weakness) :key weakness))
   #+openmcl (ccl::hash-table-weak-p ht)
-  #+lispworks (system::hash-table-weak-kind ht))
+  #+lispworks (system::hash-table-weak-kind ht)
+  #+clasp (core:hash-table-weakness ht))
 
 ;;;; Finalizers
 
 ;;; Note: Lispworks can't finalize gensyms.
 
-#+(or allegro clisp lispworks openmcl)
+#+(or allegro clisp lispworks openmcl clasp)
 (defvar *finalizers*
   (cl:make-hash-table :test 'eq
                       #+allegro :weak-keys #+:allegro t
                       #+(or clisp openmcl) :weak
                       #+lispworks :weak-kind
-                      #+(or clisp openmcl lispworks) :key)
+                      #+(or clisp openmcl lispworks) :key
+                      #+clasp :weakness #+clasp :key)
   "Weak hashtable that holds registered finalizers.")
 
 #+corman
