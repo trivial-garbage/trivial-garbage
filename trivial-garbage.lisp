@@ -88,7 +88,8 @@
   #+ecl (si:gc t)
   #+openmcl (ccl:gc)
   #+corman (ccl:gc (if full 3 0))
-  #+lispworks (hcl:gc-generation (if full t 0)))
+  #+lispworks (hcl:gc-generation (if full t 0))
+  #+clasp (gctools:garbage-collect))
 
 ;;;; Weak Pointers
 
@@ -121,7 +122,8 @@
   #+lispworks
   (let ((array (make-array 1 :weak t)))
     (setf (svref array 0) object)
-    (%make-weak-pointer :pointer array)))
+    (%make-weak-pointer :pointer array))
+  #+clasp (core:make-weak-pointer object))
 
 #-(or allegro openmcl lispworks)
 (defun weak-pointer-p (object)
@@ -132,7 +134,8 @@
   #+clisp (ext:weak-pointer-p object)
   #+abcl (typep object 'ext:weak-reference)
   #+ecl (typep object 'ext:weak-pointer)
-  #+corman (ccl:weak-pointer-p object))
+  #+corman (ccl:weak-pointer-p object)
+  #+clasp (core:weak-pointer-valid object))
 
 (defun weak-pointer-value (weak-pointer)
   "If @code{weak-pointer} is valid, returns its value. Otherwise,
@@ -145,7 +148,8 @@
   #+allegro (svref (weak-pointer-pointer weak-pointer) 0)
   #+openmcl (values (gethash weak-pointer *weak-pointers*))
   #+corman (ccl:weak-pointer-obj weak-pointer)
-  #+lispworks (svref (weak-pointer-pointer weak-pointer) 0))
+  #+lispworks (svref (weak-pointer-pointer weak-pointer) 0)
+  #+clasp (core:weak-pointer-value weak-pointer))
 
 ;;;; Weak Hash-tables
 
@@ -155,7 +159,7 @@
 
 (defun weakness-keyword-arg (weakness)
   (declare (ignorable weakness))
-  #+(or sbcl abcl ecl-weak-hash) :weakness
+  #+(or sbcl abcl clasp ecl-weak-hash) :weakness
   #+(or clisp openmcl) :weak
   #+lispworks :weak-kind
   #+allegro (case weakness (:key :weak-keys) (:value :values))
@@ -180,24 +184,24 @@
   (declare (ignorable errorp))
   (ecase weakness
     (:key
-     #+(or lispworks sbcl abcl clisp openmcl ecl-weak-hash) :key
+     #+(or lispworks sbcl abcl clasp clisp openmcl ecl-weak-hash) :key
      #+(or allegro cmu) t
-     #-(or lispworks sbcl abcl clisp openmcl allegro cmu ecl-weak-hash)
+     #-(or lispworks sbcl abcl clisp openmcl allegro cmu ecl-weak-hash clasp)
      (weakness-missing weakness errorp))
     (:value
      #+allegro :weak
      #+(or clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash) :value
-     #-(or allegro clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash)
+     #-(or allegro clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash clasp)
      (weakness-missing weakness errorp))
     (:key-or-value
      #+(or clisp sbcl abcl cmu) :key-or-value
      #+lispworks :either
-     #-(or clisp sbcl abcl lispworks cmu)
+     #-(or clisp sbcl abcl lispworks cmu clasp)
      (weakness-missing weakness errorp))
     (:key-and-value
      #+(or clisp abcl sbcl cmu ecl-weak-hash) :key-and-value
      #+lispworks :both
-     #-(or clisp sbcl abcl lispworks cmu ecl-weak-hash)
+     #-(or clisp sbcl abcl lispworks cmu ecl-weak-hash clasp)
      (weakness-missing weakness errorp))))
 
 (defun make-weak-hash-table (&rest args &key weakness (weakness-matters t)
@@ -246,7 +250,7 @@
   "Returns one of @code{nil}, @code{:key}, @code{:value},
    @code{:key-or-value} or @code{:key-and-value}."
   #-(or allegro sbcl abcl clisp cmu openmcl lispworks
-        ecl-weak-hash)
+        ecl-weak-hash clasp)
   (declare (ignore ht))
   ;; keep this first if any of the other lisps bugously insert a NIL
   ;; for the returned (values) even when *read-suppress* is NIL (e.g. clisp)
@@ -263,7 +267,8 @@
   #+cmu (let ((weakness (lisp::hash-table-weak-p ht)))
           (if (eq t weakness) :key weakness))
   #+openmcl (ccl::hash-table-weak-p ht)
-  #+lispworks (system::hash-table-weak-kind ht))
+  #+lispworks (system::hash-table-weak-kind ht)
+  #+clasp (core:hash-table-weakness ht))
 
 ;;;; Finalizers
 
@@ -275,7 +280,8 @@
                       #+allegro :weak-keys #+:allegro t
                       #+(or clisp openmcl) :weak
                       #+lispworks :weak-kind
-                      #+(or clisp openmcl lispworks) :key)
+                      #+(or clisp openmcl lispworks) :key
+                      #+clasp :weakness #+clasp :key)
   "Weak hashtable that holds registered finalizers.")
 
 #+corman
@@ -317,6 +323,7 @@
            object (lambda (obj) (declare (ignore obj)) (funcall function)))
           (gethash object *finalizers*))
     object)
+  #+clasp (gctools:finalize object function)
   #+clisp
   ;; The CLISP code used to be a bit simpler but we had to workaround
   ;; a bug regarding the interaction between GC and weak hashtables.
@@ -375,6 +382,7 @@
     (mapc #'excl:unschedule-finalization
           (gethash object *finalizers*))
     (remhash object *finalizers*))
+  #+clasp (gctools:definalize object)
   #+clisp
   (multiple-value-bind (finalizers present-p)
       (gethash object *finalizers*)
