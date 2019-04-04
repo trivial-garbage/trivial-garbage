@@ -21,6 +21,6 @@ install:
   - curl -L https://github.com/luismbo/cl-travis/raw/master/install.sh | sh
 
 script:
-  - cl -e '(ql:quickload :trivial-garbage-tests)
+  - cl -e '(ql:quickload :trivial-garbage/tests)
            (unless (trivial-garbage-tests:run)
              (uiop:quit 1))'
