@@ -299,6 +299,24 @@
       (unless (null finalizers)
         (mapc #'funcall finalizers)))))
 
+;;; Note: ECL bytecmp does not perform escape analysis and unused
+;;; variables are not optimized away from its lexenv. That leads to
+;;; closing over whole definition lexenv. That's why we define
+;;; EXTEND-FINALIZER-FN which defines lambda outside the lexical scope
+;;; of FINALIZE (which inludes object) - to prevent closing over
+;;; finalized object. This problem does not apply to C compiler.
+
+#+ecl
+(defun extend-finalizer-fn (old-fn new-fn)
+  (if (null old-fn)
+      (lambda (obj)
+        (declare (ignore obj))
+        (funcall new-fn))
+      (lambda (obj)
+        (declare (ignore obj))
+        (funcall new-fn)
+        (funcall old-fn nil))))
+
 (defun finalize (object function)
   "Pushes a new @code{function} to the @code{object}'s list of
    finalizers. @code{function} should take no arguments. Returns
@@ -310,13 +328,9 @@
   #+(or cmu scl) (ext:finalize object function)
   #+sbcl (sb-ext:finalize object function)
   #+abcl (ext:finalize object function)
-  #+ecl (let ((next-fn (ext:get-finalizer object)))
-          (ext:set-finalizer
-           object (lambda (obj)
-                    (declare (ignore obj))
-                    (funcall function)
-                    (when next-fn
-                      (funcall next-fn nil)))))
+  #+ecl (let* ((old-fn (ext:get-finalizer object))
+               (new-fn (extend-finalizer-fn old-fn function)))
+          (ext:set-finalizer object new-fn))
   #+allegro
   (progn
     (push (excl:schedule-finalization
