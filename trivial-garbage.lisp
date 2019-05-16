@@ -330,7 +330,8 @@
   #+abcl (ext:finalize object function)
   #+ecl (let* ((old-fn (ext:get-finalizer object))
                (new-fn (extend-finalizer-fn old-fn function)))
-          (ext:set-finalizer object new-fn))
+          (ext:set-finalizer object new-fn)
+          object)
   #+allegro
   (progn
     (push (excl:schedule-finalization
