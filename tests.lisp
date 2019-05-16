@@ -78,15 +78,20 @@
   nil)
 
 (defun test-finalizers-aux (count extra-action)
-  (let ((cons (list 0))
-        (obj (string (gensym))))
+  (let* ((cons (list 0))
+         ;; lbd should not be defined in a lexical scope where obj is
+         ;; present to prevent closing over the variable on compilers
+         ;; which does not optimize away unused lexenv variables (i.e
+         ;; ecl's bytecmp).
+         (lbd (lambda () (incf (car cons))))
+         (obj (string (gensym))))
     (dotimes (i count)
-      (finalize obj (lambda () (incf (car cons)))))
+      (finalize obj lbd))
     (when extra-action
       (cancel-finalization obj)
       (when (eq extra-action :add-again)
         (dotimes (i count)
-          (finalize obj (lambda () (incf (car cons)))))))
+          (finalize obj lbd))))
     (setq obj (gensym))
     (setq obj (dummy obj))
     cons))
