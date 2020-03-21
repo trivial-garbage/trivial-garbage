@@ -45,7 +45,10 @@
   (pushnew 'hashtables.weak-value.1 rt::*expected-failures*))
 
 #+clasp
-(pushnew 'hashtables.weak-value.1 rt::*expected-failures*)
+(progn
+  (pushnew 'pointers.1 rt::*expected-failures*)
+  (pushnew 'pointers.2 rt::*expected-failures*)
+  (pushnew 'hashtables.weak-value.1 rt::*expected-failures*))
 
 (deftest hashtables.weak-key.1
     (let ((ht (make-weak-hash-table :weakness :key)))
