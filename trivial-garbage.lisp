@@ -191,17 +191,17 @@
     (:value
      #+allegro :weak
      #+(or clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash) :value
-     #-(or allegro clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash clasp)
+     #-(or allegro clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash)
      (weakness-missing weakness errorp))
     (:key-or-value
      #+(or clisp sbcl abcl cmu) :key-or-value
      #+lispworks :either
-     #-(or clisp sbcl abcl lispworks cmu clasp)
+     #-(or clisp sbcl abcl lispworks cmu)
      (weakness-missing weakness errorp))
     (:key-and-value
      #+(or clisp abcl sbcl cmu ecl-weak-hash) :key-and-value
      #+lispworks :both
-     #-(or clisp sbcl abcl lispworks cmu ecl-weak-hash clasp)
+     #-(or clisp sbcl abcl lispworks cmu ecl-weak-hash)
      (weakness-missing weakness errorp))))
 
 (defun make-weak-hash-table (&rest args &key weakness (weakness-matters t)
@@ -231,6 +231,7 @@
             (opt (weakness-keyword-opt weakness weakness-matters)))
         (apply #'cl:make-hash-table
                #+openmcl :test #+openmcl (if (eq opt :key) #'eq test)
+               #+clasp :test #+clasp #'eq
                (if arg
                    (list* arg opt args)
                    args)))
@@ -338,7 +339,7 @@
            object (lambda (obj) (declare (ignore obj)) (funcall function)))
           (gethash object *finalizers*))
     object)
-  #+clasp (gctools:finalize object function)
+  #+clasp (gctools:finalize object (lambda (obj) (declare (ignore obj)) (funcall function)))
   #+clisp
   ;; The CLISP code used to be a bit simpler but we had to workaround
   ;; a bug regarding the interaction between GC and weak hashtables.
