@@ -89,8 +89,7 @@
   #+openmcl (ccl:gc)
   #+corman (ccl:gc (if full 3 0))
   #+lispworks (hcl:gc-generation (if full t 0))
-  #+clasp (gctools:garbage-collect)
-  )
+  #+clasp (gctools:garbage-collect))
 
 ;;;; Weak Pointers
 
@@ -124,8 +123,7 @@
   (let ((array (make-array 1 :weak t)))
     (setf (svref array 0) object)
     (%make-weak-pointer :pointer array))
-  #+clasp (core:make-weak-pointer object)
-  )
+  #+clasp (core:make-weak-pointer object))
 
 #-(or allegro openmcl lispworks)
 (defun weak-pointer-p (object)
@@ -165,8 +163,7 @@
   #+(or clisp openmcl) :weak
   #+lispworks :weak-kind
   #+allegro (case weakness (:key :weak-keys) (:value :values))
-  #+cmu :weak-p
-  #+clasp :weakness)
+  #+cmu :weak-p)
 
 (defvar *weakness-warnings* '()
   "List of weaknesses that have already been warned about this
