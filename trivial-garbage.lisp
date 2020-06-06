@@ -186,7 +186,7 @@
     (:key
      #+(or lispworks sbcl abcl clasp clisp openmcl ecl-weak-hash) :key
      #+(or allegro cmu) t
-     #-(or lispworks sbcl abcl clisp openmcl allegro cmu ecl-weak-hash)
+     #-(or lispworks sbcl abcl clisp openmcl allegro cmu ecl-weak-hash clasp)
      (weakness-missing weakness errorp))
     (:value
      #+allegro :weak
