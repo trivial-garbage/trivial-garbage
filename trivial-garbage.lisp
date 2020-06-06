@@ -186,22 +186,22 @@
     (:key
      #+(or lispworks sbcl abcl clasp clisp openmcl ecl-weak-hash) :key
      #+(or allegro cmu) t
-     #-(or lispworks sbcl abcl clisp openmcl allegro cmu ecl-weak-hash clasp)
+     #-(or lispworks sbcl abcl clisp openmcl allegro cmu ecl-weak-hash)
      (weakness-missing weakness errorp))
     (:value
      #+allegro :weak
      #+(or clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash) :value
-     #-(or allegro clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash clasp)
+     #-(or allegro clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash)
      (weakness-missing weakness errorp))
     (:key-or-value
      #+(or clisp sbcl abcl cmu) :key-or-value
      #+lispworks :either
-     #-(or clisp sbcl abcl lispworks cmu clasp)
+     #-(or clisp sbcl abcl lispworks cmu)
      (weakness-missing weakness errorp))
     (:key-and-value
      #+(or clisp abcl sbcl cmu ecl-weak-hash) :key-and-value
      #+lispworks :both
-     #-(or clisp sbcl abcl lispworks cmu ecl-weak-hash clasp)
+     #-(or clisp sbcl abcl lispworks cmu ecl-weak-hash)
      (weakness-missing weakness errorp))))
 
 (defun make-weak-hash-table (&rest args &key weakness (weakness-matters t)
