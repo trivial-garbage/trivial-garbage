@@ -275,7 +275,7 @@
 
 ;;; Note: Lispworks can't finalize gensyms.
 
-#+(or allegro clisp lispworks openmcl clasp)
+#+(or allegro clasp clisp lispworks openmcl)
 (defvar *finalizers*
   (cl:make-hash-table :test 'eq
                       #+allegro :weak-keys #+:allegro t
