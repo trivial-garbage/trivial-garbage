@@ -161,7 +161,7 @@
 
 (defun weakness-keyword-arg (weakness)
   (declare (ignorable weakness))
-  #+(or sbcl abcl ecl-weak-hash) :weakness
+  #+(or sbcl abcl clasp ecl-weak-hash) :weakness
   #+(or clisp openmcl) :weak
   #+lispworks :weak-kind
   #+allegro (case weakness (:key :weak-keys) (:value :values))
@@ -187,9 +187,8 @@
   (declare (ignorable errorp))
   (ecase weakness
     (:key
-     #+(or lispworks sbcl abcl clisp openmcl ecl-weak-hash) :key
+     #+(or lispworks sbcl abcl clasp clisp openmcl ecl-weak-hash) :key
      #+(or allegro cmu) t
-     #+clasp :key
      #-(or lispworks sbcl abcl clisp openmcl allegro cmu ecl-weak-hash clasp)
      (weakness-missing weakness errorp))
     (:value
@@ -235,6 +234,7 @@
             (opt (weakness-keyword-opt weakness weakness-matters)))
         (apply #'cl:make-hash-table
                #+openmcl :test #+openmcl (if (eq opt :key) #'eq test)
+               #+clasp :test #+clasp #'eq
                (if arg
                    (list* arg opt args)
                    args)))
@@ -303,6 +303,24 @@
       (unless (null finalizers)
         (mapc #'funcall finalizers)))))
 
+;;; Note: ECL bytecmp does not perform escape analysis and unused
+;;; variables are not optimized away from its lexenv. That leads to
+;;; closing over whole definition lexenv. That's why we define
+;;; EXTEND-FINALIZER-FN which defines lambda outside the lexical scope
+;;; of FINALIZE (which inludes object) - to prevent closing over
+;;; finalized object. This problem does not apply to C compiler.
+
+#+ecl
+(defun extend-finalizer-fn (old-fn new-fn)
+  (if (null old-fn)
+      (lambda (obj)
+        (declare (ignore obj))
+        (funcall new-fn))
+      (lambda (obj)
+        (declare (ignore obj))
+        (funcall new-fn)
+        (funcall old-fn nil))))
+
 (defun finalize (object function)
   "Pushes a new @code{function} to the @code{object}'s list of
    finalizers. @code{function} should take no arguments. Returns
@@ -314,19 +332,17 @@
   #+(or cmu scl) (ext:finalize object function)
   #+sbcl (sb-ext:finalize object function)
   #+abcl (ext:finalize object function)
-  #+ecl (let ((next-fn (ext:get-finalizer object)))
-          (ext:set-finalizer
-           object (lambda (obj)
-                    (declare (ignore obj))
-                    (funcall function)
-                    (when next-fn
-                      (funcall next-fn nil)))))
+  #+ecl (let* ((old-fn (ext:get-finalizer object))
+               (new-fn (extend-finalizer-fn old-fn function)))
+          (ext:set-finalizer object new-fn)
+          object)
   #+allegro
   (progn
     (push (excl:schedule-finalization
            object (lambda (obj) (declare (ignore obj)) (funcall function)))
           (gethash object *finalizers*))
     object)
+  #+clasp (gctools:finalize object (lambda (obj) (declare (ignore obj)) (funcall function)))
   #+clisp
   ;; The CLISP code used to be a bit simpler but we had to workaround
   ;; a bug regarding the interaction between GC and weak hashtables.
@@ -385,6 +401,7 @@
     (mapc #'excl:unschedule-finalization
           (gethash object *finalizers*))
     (remhash object *finalizers*))
+  #+clasp (gctools:definalize object)
   #+clisp
   (multiple-value-bind (finalizers present-p)
       (gethash object *finalizers*)
