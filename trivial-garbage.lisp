@@ -89,7 +89,8 @@
   #+openmcl (ccl:gc)
   #+corman (ccl:gc (if full 3 0))
   #+lispworks (hcl:gc-generation (if full t 0))
-  #+clasp (gctools:garbage-collect))
+  #+clasp (gctools:garbage-collect)
+  #+mezzano (mezzano.extensions:gc :full full))
 
 ;;;; Weak Pointers
 
@@ -123,7 +124,8 @@
   (let ((array (make-array 1 :weak t)))
     (setf (svref array 0) object)
     (%make-weak-pointer :pointer array))
-  #+clasp (core:make-weak-pointer object))
+  #+clasp (core:make-weak-pointer object)
+  #+mezzano (mezzano.extensions:make-weak-pointer object))
 
 #-(or allegro openmcl lispworks)
 (defun weak-pointer-p (object)
@@ -135,7 +137,8 @@
   #+abcl (typep object 'ext:weak-reference)
   #+ecl (typep object 'ext:weak-pointer)
   #+corman (ccl:weak-pointer-p object)
-  #+clasp (core:weak-pointer-valid object))
+  #+clasp (core:weak-pointer-valid object)
+  #+mezzano (mezzano.extensions:weak-pointer-p object))
 
 (defun weak-pointer-value (weak-pointer)
   "If @code{weak-pointer} is valid, returns its value. Otherwise,
@@ -149,7 +152,8 @@
   #+openmcl (values (gethash weak-pointer *weak-pointers*))
   #+corman (ccl:weak-pointer-obj weak-pointer)
   #+lispworks (svref (weak-pointer-pointer weak-pointer) 0)
-  #+clasp (core:weak-pointer-value weak-pointer))
+  #+clasp (core:weak-pointer-value weak-pointer)
+  #+mezzano (values (mezzano.extensions:weak-pointer-value object)))
 
 ;;;; Weak Hash-tables
 
@@ -159,7 +163,7 @@
 
 (defun weakness-keyword-arg (weakness)
   (declare (ignorable weakness))
-  #+(or sbcl abcl clasp ecl-weak-hash) :weakness
+  #+(or sbcl abcl clasp ecl-weak-hash mezzano) :weakness
   #+(or clisp openmcl) :weak
   #+lispworks :weak-kind
   #+allegro (case weakness (:key :weak-keys) (:value :values))
@@ -184,24 +188,24 @@
   (declare (ignorable errorp))
   (ecase weakness
     (:key
-     #+(or lispworks sbcl abcl clasp clisp openmcl ecl-weak-hash) :key
+     #+(or lispworks sbcl abcl clasp clisp openmcl ecl-weak-hash mezzano) :key
      #+(or allegro cmu) t
-     #-(or lispworks sbcl abcl clisp openmcl allegro cmu ecl-weak-hash clasp)
+     #-(or lispworks sbcl abcl clisp openmcl allegro cmu ecl-weak-hash clasp mezzano)
      (weakness-missing weakness errorp))
     (:value
      #+allegro :weak
-     #+(or clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash) :value
-     #-(or allegro clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash)
+     #+(or clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash mezzano) :value
+     #-(or allegro clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash mezzano)
      (weakness-missing weakness errorp))
     (:key-or-value
-     #+(or clisp sbcl abcl cmu) :key-or-value
+     #+(or clisp sbcl abcl cmu mezzano) :key-or-value
      #+lispworks :either
-     #-(or clisp sbcl abcl lispworks cmu)
+     #-(or clisp sbcl abcl lispworks cmu mezzano)
      (weakness-missing weakness errorp))
     (:key-and-value
-     #+(or clisp abcl sbcl cmu ecl-weak-hash) :key-and-value
+     #+(or clisp abcl sbcl cmu ecl-weak-hash mezzano) :key-and-value
      #+lispworks :both
-     #-(or clisp sbcl abcl lispworks cmu ecl-weak-hash)
+     #-(or clisp sbcl abcl lispworks cmu ecl-weak-hash mezzano)
      (weakness-missing weakness errorp))))
 
 (defun make-weak-hash-table (&rest args &key weakness (weakness-matters t)
@@ -251,7 +255,7 @@
   "Returns one of @code{nil}, @code{:key}, @code{:value},
    @code{:key-or-value} or @code{:key-and-value}."
   #-(or allegro sbcl abcl clisp cmu openmcl lispworks
-        ecl-weak-hash clasp)
+        ecl-weak-hash clasp mezzano)
   (declare (ignore ht))
   ;; keep this first if any of the other lisps bugously insert a NIL
   ;; for the returned (values) even when *read-suppress* is NIL (e.g. clisp)
@@ -269,7 +273,8 @@
           (if (eq t weakness) :key weakness))
   #+openmcl (ccl::hash-table-weak-p ht)
   #+lispworks (system::hash-table-weak-kind ht)
-  #+clasp (core:hash-table-weakness ht))
+  #+clasp (core:hash-table-weakness ht)
+  #+mezzano (mezzano.extensions:hash-table-weakness ht))
 
 ;;;; Finalizers
 
@@ -299,6 +304,13 @@
     (let ((finalizers (gethash object *finalizers*)))
       (unless (null finalizers)
         (mapc #'funcall finalizers)))))
+
+#+mezzano
+(progn
+  (defvar *finalizers*
+    (cl:make-hash-table :test 'eq :weakness :key)
+    "Weak hashtable that holds registered finalizers.")
+  (defvar *finalizers-lock* (mezzano.supervisor:make-mutex '*finalizers-lock*)))
 
 ;;; Note: ECL bytecmp does not perform escape analysis and unused
 ;;; variables are not optimized away from its lexenv. That leads to
@@ -384,7 +396,25 @@
         (hcl:flag-special-free-action object))
       (setf (gethash object *finalizers*)
             (cons function finalizers)))
-    object))
+    object)
+  #+mezzano
+  (mezzano.supervisor:with-mutex (*finalizers-lock*)
+    (let ((finalizer-key (gethash object *finalizers*)))
+      (unless finalizer-key
+        (setf finalizer-key
+              (mezzano.extensions:make-weak-pointer
+               object
+               :finalizer (lambda ()
+                            (let ((finalizers (mezzano.supervisor:with-mutex (*finalizers-lock*)
+                                                (prog1
+                                                    (gethash finalizer-key *finalizers*)
+                                                  (remhash finalizer-key *finalizers*)))))
+                              (mapc #'funcall finalizers)))))
+        (setf (gethash object *finalizers*) finalizer-key))
+      (push function (gethash finalizer-key *finalizers*)))
+    ;; Make sure the object doesn't actually get captured by the finalizer lambda.
+    (prog1 object
+      (setf object nil))))
 
 (defun cancel-finalization (object)
   "Cancels all of @code{object}'s finalizers, if any."
@@ -417,4 +447,9 @@
   #+lispworks
   (progn
     (remhash object *finalizers*)
-    (hcl:flag-not-special-free-action object)))
+    (hcl:flag-not-special-free-action object))
+  #+mezzano
+  (mezzano.supervisor:with-mutex (*finalizers-lock*)
+    (let ((finalizer-key (gethash object *finalizers*)))
+      (when finalizer-key
+        (setf (gethash finalizer-key *finalizers*) '())))))
