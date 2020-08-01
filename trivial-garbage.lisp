@@ -286,8 +286,7 @@
                       #+allegro :weak-keys #+:allegro t
                       #+(or clisp openmcl) :weak
                       #+lispworks :weak-kind
-                      #+(or clisp openmcl lispworks) :key
-                      #+clasp :weakness #+clasp :key)
+                      #+(or clisp openmcl lispworks) :key)
   "Weak hashtable that holds registered finalizers.")
 
 #+corman
