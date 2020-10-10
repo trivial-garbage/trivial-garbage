@@ -1,4 +1,5 @@
-;;;; -*- Mode: lisp; indent-tabs-mode: nil -*-
+;;;; -*- Mode: LISP; Syntax: ANSI-Common-lisp; Base: 10; Package: ASDF -*-
+;;;; The above modeline is required for Genera. Do not change.
 ;;;
 ;;; trivial-garbage.asd --- ASDF system definition for trivial-garbage.
 ;;;
@@ -6,7 +7,7 @@
 ;;; <loliveira@common-lisp.net> and is provided with absolutely no
 ;;; warranty.
 
-#-(or cmu scl sbcl allegro clisp openmcl corman lispworks ecl abcl clasp mezzano)
+#-(or cmu scl sbcl allegro clisp openmcl corman lispworks ecl abcl clasp mezzano genera)
 (error "Sorry, your Lisp is not supported by trivial-garbage.")
 
 (defsystem trivial-garbage

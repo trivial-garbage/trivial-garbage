@@ -1,4 +1,5 @@
-;;;; -*- Mode: lisp; indent-tabs-mode: nil -*-
+;;;; -*- Mode: LISP; Syntax: ANSI-Common-lisp; Base: 10 -*-
+;;;; The above modeline is required for Genera. Do not change.
 ;;;
 ;;; tests.lisp --- trivial-garbage tests.
 ;;;
@@ -50,6 +51,11 @@
   (pushnew 'pointers.2 rt::*expected-failures*)
   (pushnew 'hashtables.weak-value.1 rt::*expected-failures*))
 
+#+genera
+(progn
+  (pushnew 'hashtables.weak-key.1 rt::*expected-failures*)
+  (pushnew 'hashtables.weak-key.2 rt::*expected-failures*))
+
 (deftest hashtables.weak-key.1
     (let ((ht (make-weak-hash-table :weakness :key)))
       (values (hash-table-p ht)
@@ -100,6 +106,14 @@
     cons))
 
 (defvar *result*)
+
+#+genera
+(progn
+  (pushnew 'finalizers.1 rt::*expected-failures*)
+  (pushnew 'finalizers.2 rt::*expected-failures*)
+  (pushnew 'finalizers.3 rt::*expected-failures*)
+  (pushnew 'finalizers.4 rt::*expected-failures*)
+  (pushnew 'finalizers.5 rt::*expected-failures*))
 
 ;;; I don't really understand this, but it seems to work, and stems
 ;;; from the observation that typing the code in sequence at the REPL
