@@ -93,8 +93,10 @@
   #+clasp (gctools:garbage-collect)
   #+mezzano (mezzano.extensions:gc :full full)
   #+genera (if full
-	       (sys:gc-immediately t)
-	       (si:ephemeral-gc-flip)))
+	       (let ((si:gc-reports-enable verbose))
+		 (sys:gc-immediately t))
+	       (let ((si:gc-ephemeral-reports-enable verbose))
+		 (si:ephemeral-gc-flip))))
 
 ;;;; Weak Pointers
 
