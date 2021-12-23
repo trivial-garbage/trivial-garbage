@@ -92,11 +92,13 @@
   #+lispworks (hcl:gc-generation (if full t 0))
   #+clasp (gctools:garbage-collect)
   #+mezzano (mezzano.extensions:gc :full full)
-  #+genera (if full
-	       (let ((si:gc-reports-enable verbose))
-		 (sys:gc-immediately t))
-	       (let ((si:gc-ephemeral-reports-enable verbose))
-		 (si:ephemeral-gc-flip))))
+  #+genera (scl:let-globally ((si:gc-report-stream *standard-output*)
+                              (si:gc-reports-enable verbose)
+                              (si:gc-ephemeral-reports-enable verbose)
+                              (si:gc-warnings-enable verbose))
+             (if full
+                 (sys:gc-immediately t)
+                 (si:ephemeral-gc-flip))))
 
 ;;;; Weak Pointers
 
@@ -288,8 +290,8 @@
   #+clasp (core:hash-table-weakness ht)
   #+mezzano (mezzano.extensions:hash-table-weakness ht)
   #+genera (if (null (getf (cli::basic-table-options ht) :gc-protect-values t))
-	       :value
-	       nil))
+               :value
+               nil))
 
 ;;;; Finalizers
 
