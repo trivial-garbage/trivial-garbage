@@ -368,7 +368,7 @@
            object (lambda (obj) (declare (ignore obj)) (funcall function)))
           (gethash object *finalizers*))
     object)
-  #+clasp (gctools:finalize object (lambda (obj) (declare (ignore obj)) (funcall function)))
+  #+clasp (progn (gctools:finalize object (lambda (obj) (declare (ignore obj)) (funcall function))) object)
   #+clisp
   ;; The CLISP code used to be a bit simpler but we had to workaround
   ;; a bug regarding the interaction between GC and weak hashtables.
