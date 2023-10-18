@@ -356,7 +356,7 @@
    being garbage collected."
   #+genera (declare (ignore object function))
   #+(or cmu scl) (ext:finalize object function)
-  #+sbcl (sb-ext:finalize object function)
+  #+sbcl (sb-ext:finalize object function :dont-save t)
   #+abcl (ext:finalize object function)
   #+ecl (let* ((old-fn (ext:get-finalizer object))
                (new-fn (extend-finalizer-fn old-fn function)))
