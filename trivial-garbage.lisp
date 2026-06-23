@@ -92,6 +92,7 @@
   #+lispworks (hcl:gc-generation (if full t 0))
   #+clasp (gctools:garbage-collect)
   #+mezzano (mezzano.extensions:gc :full full)
+  #+dotcl (dotcl:gc)
   #+genera (scl:let-globally ((si:gc-report-stream *standard-output*)
                               (si:gc-reports-enable verbose)
                               (si:gc-ephemeral-reports-enable verbose)
@@ -142,7 +143,8 @@
     (setf (svref array 0) object)
     (%make-weak-pointer :pointer array))
   #+clasp (core:make-weak-pointer object)
-  #+mezzano (mezzano.extensions:make-weak-pointer object))
+  #+mezzano (mezzano.extensions:make-weak-pointer object)
+  #+dotcl (dotcl:make-weak-pointer object))
 
 #-(or allegro openmcl lispworks genera cl-amiga)
 (defun weak-pointer-p (object)
@@ -155,7 +157,8 @@
   #+ecl (typep object 'ext:weak-pointer)
   #+corman (ccl:weak-pointer-p object)
   #+clasp (core:weak-pointer-valid object)
-  #+mezzano (mezzano.extensions:weak-pointer-p object))
+  #+mezzano (mezzano.extensions:weak-pointer-p object)
+  #+dotcl (dotcl:weak-pointer-p object))
 
 (defun weak-pointer-value (weak-pointer)
   "If @code{weak-pointer} is valid, returns its value. Otherwise,
@@ -170,7 +173,8 @@
   #+corman (ccl:weak-pointer-obj weak-pointer)
   #+lispworks (svref (weak-pointer-pointer weak-pointer) 0)
   #+clasp (core:weak-pointer-value weak-pointer)
-  #+mezzano (values (mezzano.extensions:weak-pointer-value object)))
+  #+mezzano (values (mezzano.extensions:weak-pointer-value object))
+  #+dotcl (values (dotcl:weak-pointer-value weak-pointer)))
 
 ;;;; Weak Hash-tables
 
@@ -180,7 +184,7 @@
 
 (defun weakness-keyword-arg (weakness)
   (declare (ignorable weakness))
-  #+(or sbcl abcl clasp ecl-weak-hash mezzano) :weakness
+  #+(or sbcl abcl clasp ecl-weak-hash mezzano dotcl) :weakness
   #+(or clisp openmcl) :weak
   #+lispworks :weak-kind
   #+allegro (case weakness (:key :weak-keys) (:value :values))
@@ -213,29 +217,29 @@
   ;; caller's `(if arg (list* arg opt args) args)` guard.
   (ecase weakness
     (:key
-     #+(or lispworks sbcl abcl clasp clisp openmcl ecl-weak-hash mezzano) :key
+     #+(or lispworks sbcl abcl clasp clisp openmcl ecl-weak-hash mezzano dotcl) :key
      #+(or allegro cmu) t
      #+cl-amiga nil
-     #-(or lispworks sbcl abcl clisp openmcl allegro cmu ecl-weak-hash clasp mezzano cl-amiga)
+     #-(or lispworks sbcl abcl clisp openmcl allegro cmu ecl-weak-hash clasp mezzano cl-amiga dotcl)
      (weakness-missing weakness errorp))
     (:value
      #+allegro :weak
-     #+(or clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash mezzano) :value
+     #+(or clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash mezzano dotcl) :value
      #+genera nil
      #+cl-amiga nil
-     #-(or allegro clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash mezzano genera cl-amiga)
+     #-(or allegro clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash mezzano genera cl-amiga dotcl)
      (weakness-missing weakness errorp))
     (:key-or-value
-     #+(or clisp sbcl abcl cmu mezzano) :key-or-value
+     #+(or clisp sbcl abcl cmu mezzano dotcl) :key-or-value
      #+lispworks :either
      #+cl-amiga nil
-     #-(or clisp sbcl abcl lispworks cmu mezzano cl-amiga)
+     #-(or clisp sbcl abcl lispworks cmu mezzano cl-amiga dotcl)
      (weakness-missing weakness errorp))
     (:key-and-value
-     #+(or clisp abcl sbcl cmu ecl-weak-hash mezzano) :key-and-value
+     #+(or clisp abcl sbcl cmu ecl-weak-hash mezzano dotcl) :key-and-value
      #+lispworks :both
      #+cl-amiga nil
-     #-(or clisp sbcl abcl lispworks cmu ecl-weak-hash mezzano cl-amiga)
+     #-(or clisp sbcl abcl lispworks cmu ecl-weak-hash mezzano cl-amiga dotcl)
      (weakness-missing weakness errorp))))
 
 (defun make-weak-hash-table (&rest args &key weakness (weakness-matters t)
@@ -285,7 +289,7 @@
   "Returns one of @code{nil}, @code{:key}, @code{:value},
    @code{:key-or-value} or @code{:key-and-value}."
   #-(or allegro sbcl abcl clisp cmu openmcl lispworks
-        ecl-weak-hash clasp mezzano genera)
+        ecl-weak-hash clasp mezzano genera dotcl)
   (declare (ignore ht))
   ;; keep this first if any of the other lisps bugously insert a NIL
   ;; for the returned (values) even when *read-suppress* is NIL (e.g. clisp)
@@ -305,6 +309,7 @@
   #+lispworks (system::hash-table-weak-kind ht)
   #+clasp (core:hash-table-weakness ht)
   #+mezzano (mezzano.extensions:hash-table-weakness ht)
+  #+dotcl (dotcl:hash-table-weakness ht)
   #+genera (if (null (getf (cli::basic-table-options ht) :gc-protect-values t))
                :value
                nil))
@@ -450,6 +455,7 @@
     ;; Make sure the object doesn't actually get captured by the finalizer lambda.
     (prog1 object
       (setf object nil)))
+  #+dotcl (progn (dotcl:finalize object function) object)
   #+genera
   (error "Finalizers are not available in Genera."))
 
@@ -492,5 +498,6 @@
     (let ((finalizer-key (gethash object *finalizers*)))
       (when finalizer-key
         (setf (gethash finalizer-key *finalizers*) '()))))
+  #+dotcl (dotcl:cancel-finalization object)
   #+genera
   (error "Finalizers are not available in Genera."))
