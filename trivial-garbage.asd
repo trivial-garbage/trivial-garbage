@@ -7,7 +7,7 @@
 ;;; <loliveira@common-lisp.net> and is provided with absolutely no
 ;;; warranty.
 
-#-(or cmu scl sbcl allegro clisp openmcl corman lispworks ecl abcl clasp mezzano genera)
+#-(or cmu scl sbcl allegro clisp openmcl corman lispworks ecl abcl clasp mezzano genera cl-amiga)
 (error "Sorry, your Lisp is not supported by trivial-garbage.")
 
 (defsystem trivial-garbage
