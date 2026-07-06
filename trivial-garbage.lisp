@@ -85,7 +85,7 @@
   #+(or cmu scl) (ext:gc :verbose verbose :full full)
   #+sbcl (sb-ext:gc :full full)
   #+allegro (excl:gc (not (null full)))
-  #+(or abcl clisp) (ext:gc)
+  #+(or abcl clisp cl-amiga) (ext:gc)
   #+ecl (si:gc t)
   #+openmcl (ccl:gc)
   #+corman (ccl:gc (if full 3 0))
@@ -110,9 +110,14 @@
 (defvar *weak-pointers* (scl:make-hash-table :test 'eq :gc-protect-values nil)
   "Weak value hash-table mapping between pseudo weak pointers and its values.")
 
-#+(or allegro openmcl lispworks genera)
+#+cl-amiga
+(defvar *weak-pointers* (cl:make-hash-table :test 'eq)
+  "Hash-table mapping between pseudo weak pointers and its values.
+   CL-Amiga does not support true weak references, so values are held strongly.")
+
+#+(or allegro openmcl lispworks genera cl-amiga)
 (defstruct (weak-pointer (:constructor %make-weak-pointer))
-  #-(or openmcl genera) pointer)
+  #-(or openmcl genera cl-amiga) pointer)
 
 (defun make-weak-pointer (object)
   "Creates a new weak pointer which points to @code{object}. For
@@ -127,7 +132,7 @@
   (let ((wv (excl:weak-vector 1)))
     (setf (svref wv 0) object)
     (%make-weak-pointer :pointer wv))
-  #+(or openmcl genera)
+  #+(or openmcl genera cl-amiga)
   (let ((wp (%make-weak-pointer)))
     (setf (gethash wp *weak-pointers*) object)
     wp)
@@ -139,7 +144,7 @@
   #+clasp (core:make-weak-pointer object)
   #+mezzano (mezzano.extensions:make-weak-pointer object))
 
-#-(or allegro openmcl lispworks genera)
+#-(or allegro openmcl lispworks genera cl-amiga)
 (defun weak-pointer-p (object)
   "Returns @em{true} if @code{object} is a weak pointer and @code{nil}
    otherwise."
@@ -161,7 +166,7 @@
   #+abcl (values (ext:weak-reference-value weak-pointer))
   #+ecl (values (ext:weak-pointer-value weak-pointer))
   #+allegro (svref (weak-pointer-pointer weak-pointer) 0)
-  #+(or openmcl genera) (values (gethash weak-pointer *weak-pointers*))
+  #+(or openmcl genera cl-amiga) (values (gethash weak-pointer *weak-pointers*))
   #+corman (ccl:weak-pointer-obj weak-pointer)
   #+lispworks (svref (weak-pointer-pointer weak-pointer) 0)
   #+clasp (core:weak-pointer-value weak-pointer)
@@ -199,27 +204,38 @@
 
 (defun weakness-keyword-opt (weakness errorp)
   (declare (ignorable errorp))
+  ;; cl-amiga: we fall back to a regular (non-weak) hash-table for all
+  ;; weakness kinds.  This keeps code that uses tg:make-weak-hash-table
+  ;; functioning; the hash-table just won't release entries when only
+  ;; the key or value is reachable.  Memory stays live longer than ideal
+  ;; but correctness is preserved.  weakness-keyword-arg already returns
+  ;; NIL on cl-amiga, so the NIL opt here gets silently dropped by the
+  ;; caller's `(if arg (list* arg opt args) args)` guard.
   (ecase weakness
     (:key
      #+(or lispworks sbcl abcl clasp clisp openmcl ecl-weak-hash mezzano) :key
      #+(or allegro cmu) t
-     #-(or lispworks sbcl abcl clisp openmcl allegro cmu ecl-weak-hash clasp mezzano)
+     #+cl-amiga nil
+     #-(or lispworks sbcl abcl clisp openmcl allegro cmu ecl-weak-hash clasp mezzano cl-amiga)
      (weakness-missing weakness errorp))
     (:value
      #+allegro :weak
      #+(or clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash mezzano) :value
      #+genera nil
-     #-(or allegro clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash mezzano genera)
+     #+cl-amiga nil
+     #-(or allegro clisp openmcl sbcl abcl lispworks cmu ecl-weak-hash mezzano genera cl-amiga)
      (weakness-missing weakness errorp))
     (:key-or-value
      #+(or clisp sbcl abcl cmu mezzano) :key-or-value
      #+lispworks :either
-     #-(or clisp sbcl abcl lispworks cmu mezzano)
+     #+cl-amiga nil
+     #-(or clisp sbcl abcl lispworks cmu mezzano cl-amiga)
      (weakness-missing weakness errorp))
     (:key-and-value
      #+(or clisp abcl sbcl cmu ecl-weak-hash mezzano) :key-and-value
      #+lispworks :both
-     #-(or clisp sbcl abcl lispworks cmu ecl-weak-hash mezzano)
+     #+cl-amiga nil
+     #-(or clisp sbcl abcl lispworks cmu ecl-weak-hash mezzano cl-amiga)
      (weakness-missing weakness errorp))))
 
 (defun make-weak-hash-table (&rest args &key weakness (weakness-matters t)
@@ -354,7 +370,9 @@
    @b{Note:} @code{function} should not attempt to look at
    @code{object} by closing over it because that will prevent it from
    being garbage collected."
-  #+genera (declare (ignore object function))
+  #+(or genera cl-amiga) (declare (ignore function))
+  #+genera (declare (ignore object))
+  #+cl-amiga object
   #+(or cmu scl) (ext:finalize object function)
   #+sbcl (sb-ext:finalize object function :dont-save t)
   #+abcl (ext:finalize object function)
@@ -437,7 +455,8 @@
 
 (defun cancel-finalization (object)
   "Cancels all of @code{object}'s finalizers, if any."
-  #+genera (declare (ignore object))
+  #+(or genera cl-amiga) (declare (ignore object))
+  #+(or genera cl-amiga) nil
   #+cmu (ext:cancel-finalization object)
   #+scl (ext:cancel-finalization object nil)
   #+sbcl (sb-ext:cancel-finalization object)
