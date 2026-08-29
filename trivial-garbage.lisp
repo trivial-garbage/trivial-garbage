@@ -173,7 +173,7 @@
   #+corman (ccl:weak-pointer-obj weak-pointer)
   #+lispworks (svref (weak-pointer-pointer weak-pointer) 0)
   #+clasp (core:weak-pointer-value weak-pointer)
-  #+mezzano (values (mezzano.extensions:weak-pointer-value object))
+  #+mezzano (values (mezzano.extensions:weak-pointer-value weak-pointer))
   #+dotcl (values (dotcl:weak-pointer-value weak-pointer)))
 
 ;;;; Weak Hash-tables
