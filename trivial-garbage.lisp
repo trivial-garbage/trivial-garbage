@@ -14,6 +14,9 @@
   (:shadow #:make-hash-table)
   (:nicknames #:tg)
   (:export #:gc
+           #:avoid-gc
+           #:normal-gc
+           #:with-avoid-gc
            #:make-weak-pointer
            #:weak-pointer-value
            #:weak-pointer-p
@@ -100,6 +103,34 @@
              (if full
                  (sys:gc-immediately t)
                  (si:ephemeral-gc-flip))))
+
+(defun avoid-gc ()
+  "Avoids garbage collection by either disabling it on implementations
+that expose a suitable interface or setting related parameters so that
+garbage collection is avoided as far as possible."
+  #+cmu (ext:gc-off)
+  #+scl (setf (ext:generation-gc-size-limit 0) 0)
+  #+sbcl (setf sb-kernel:*gc-inhibit* t)
+  #+lispworks-32bit (avoid-gc))
+
+(defun normal-gc ()
+  "Cancels the effect of @code{tg:avoid-gc} by either enabling garbage
+collection on implementations that expose a suitable interface or
+setting related parameters to their default settings."
+  #+cmu (ext:gc-on)
+  #+scl (setf (ext:generation-gc-size-limit 0) :unlimited)
+  #+sbcl (setf sb-kernel:*gc-inhibit* nil)
+  #+lispworks-32bit (normal-gc))
+
+(defmacro with-avoid-gc (&body body)
+  "Evaluates @code{body} with @code{tg:avoid-gc} in effect for the
+duration of evaluation. When control leaves the body, either normally
+or abnormally, garbage collection is automatically reset."
+  `(unwind-protect
+        (progn
+          (avoid-gc)
+          ,@body)
+     (normal-gc)))
 
 ;;;; Weak Pointers
 
